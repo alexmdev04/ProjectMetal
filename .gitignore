@@ -74,3 +74,7 @@ crashlytics-build.properties
 
 # Idea Config
 /.idea/
+
+# ECS Related Caches
+/[Aa]ssets/SceneDependencyCache/
+SceneDependencyCache.meta
