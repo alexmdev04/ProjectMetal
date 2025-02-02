@@ -163,6 +163,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 402c80c49fb504748bde3628e0e770e8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  startupSettings: {fileID: 11400000, guid: acf6e46ad328e6040bf9cdd3a71d71ea, type: 2}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
