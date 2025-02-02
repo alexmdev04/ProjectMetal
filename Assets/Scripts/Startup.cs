@@ -1,13 +1,12 @@
 using UnityEngine;
 
-public class Startup : MonoBehaviour
-{
-    void Start()
-    {
+public class Startup : MonoBehaviour {
+    public StartupSettings startupSettings;
+
+    private void Awake() {
         
     }
-    void Update()
-    {
+    private void Start() {
         
     }
 }
