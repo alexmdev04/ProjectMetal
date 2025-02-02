@@ -1,12 +1,15 @@
 using UnityEngine;
 
-public class Startup : MonoBehaviour {
-    public StartupSettings startupSettings;
+namespace Metal.Config {
+    public class Startup : MonoBehaviour {
+        public StartupSettings startupSettings;
 
-    private void Awake() {
-        
-    }
-    private void Start() {
-        
+        private void Awake() {
+
+        }
+
+        private void Start() {
+
+        }
     }
 }
