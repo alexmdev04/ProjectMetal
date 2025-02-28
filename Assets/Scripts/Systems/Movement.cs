@@ -39,7 +39,7 @@ namespace Metal.Systems {
             transformLookup.Update(ref state);
             wheelEntitiesLookup.Update(ref state);
             
-            state.Dependency = new VehicleJob {
+            new VehicleJob {
                 physicsWorld = SystemAPI.GetSingleton<PhysicsWorldSingleton>().PhysicsWorld,
                 transformLookup = transformLookup,
                 wheelEntitiesLookup = wheelEntitiesLookup,
@@ -52,7 +52,7 @@ namespace Metal.Systems {
                     GroupIndex = CollisionFilter.Default.GroupIndex,
                 },
                 //fixedFrameCount = SystemAPI.GetSingleton<Components.Tick>().value
-            }.Schedule(state.Dependency);
+            }.ScheduleParallel();
         }
 
         public void OnStopRunning(ref SystemState state) {
