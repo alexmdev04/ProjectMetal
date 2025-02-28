@@ -1,7 +1,7 @@
 using UnityEngine;
 
-namespace Metal.Config {
-    [CreateAssetMenu(fileName = "StartupSettings", menuName = "Scriptable Objects/Startup Settings", order = 1)]
+namespace Metal.Settings {
+    [CreateAssetMenu(fileName = "StartupSettings", menuName = "Scriptable Objects/Startup Settings")]
     public class StartupSettings : ScriptableObject {
         public bool skipToGame;
     }

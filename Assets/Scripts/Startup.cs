@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Metal.Config {
+namespace Metal.Settings {
     public class Startup : MonoBehaviour {
         public StartupSettings startupSettings;
 

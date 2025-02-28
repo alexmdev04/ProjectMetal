@@ -10,8 +10,10 @@ namespace Metal {
 
     namespace Components {
         public struct Input : IComponentData {
+            public float3 
+                movement;
+            
             public float2
-                movement,
                 aimDirectional,
                 aimCursor;
 
