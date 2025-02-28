@@ -1581,14 +1581,6 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
-    - target: {fileID: 4716852956961719016, guid: caae751893dc3484e9fa4ce662250c5d, type: 3}
-      propertyPath: m_Cylinder.Height
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 4716852956961719016, guid: caae751893dc3484e9fa4ce662250c5d, type: 3}
-      propertyPath: m_PrimitiveSize.y
-      value: 1
-      objectReference: {fileID: 0}
     - target: {fileID: 8488832058722730889, guid: caae751893dc3484e9fa4ce662250c5d, type: 3}
       propertyPath: m_Name
       value: Player
@@ -1632,10 +1624,6 @@ PrefabInstance:
     - target: {fileID: 8550586471547080799, guid: caae751893dc3484e9fa4ce662250c5d, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 9110175352628357003, guid: caae751893dc3484e9fa4ce662250c5d, type: 3}
-      propertyPath: accelerationForce
-      value: 15
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
