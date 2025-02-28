@@ -1,4 +1,3 @@
-using Metal.Authoring;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
@@ -100,7 +99,7 @@ namespace Metal.Systems {
             
             int groundedWheels = 0;
 
-            foreach (WheelEntity wheelEntity in wheelEntities) {
+            foreach (Authoring.WheelEntity wheelEntity in wheelEntities) {
                 
                 float3 wheelWorldPosition = vehicleTransformMatrix.TransformPoint(transformLookup[wheelEntity.value].Position);
                 
@@ -142,7 +141,6 @@ namespace Metal.Systems {
                 #endregion
             }
             
-
             #endregion
             
             float3 carLocalVelocity = vehicleTransformMatrix.InverseTransformDirection(vehicleVelocity.ValueRO.Linear);
@@ -153,26 +151,12 @@ namespace Metal.Systems {
             if (groundedWheels > 1) {
                 #region Accel/Decel
                 
-                float3 accelerationPoint = vehicleTransformMatrix.TransformPoint(vehicle.ValueRO.accelerationPointOffset);
-                float3 accelForce = vehicleWorldForward * inputDirection.z;
-                
                 if (vehicle.ValueRO.enableAcceleration) {
-                    
                     Extensions.AddForceAtPosition(
                         ref linearVelocityAccumulated,
                         ref angularVelocityAccumulated,
-                        accelForce * vehicle.ValueRO.accelerationForce, 
-                        accelerationPoint,
-                        vehicleMass.ValueRO.InverseMass,
-                        vehicleMass.ValueRO.InverseInertia,
-                        vehicleWorldCenterOfMass,
-                        ForceMode.Acceleration);
-                    
-                    Extensions.AddForceAtPosition(
-                        ref linearVelocityAccumulated,
-                        ref angularVelocityAccumulated,
-                        accelForce * -1.0f * vehicle.ValueRO.decelerationForce, 
-                        accelerationPoint,
+                        vehicleWorldForward * inputDirection.z * vehicle.ValueRO.accelerationForce, 
+                        vehicleTransformMatrix.TransformPoint(vehicle.ValueRO.accelerationPointOffset),
                         vehicleMass.ValueRO.InverseMass,
                         vehicleMass.ValueRO.InverseInertia,
                         vehicleWorldCenterOfMass,

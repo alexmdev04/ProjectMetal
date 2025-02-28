@@ -1,9 +1,4 @@
-using System.Collections.Generic;
-using System.Linq;
-using Unity.Collections;
 using Unity.Entities;
-using Unity.Physics.Authoring;
-using Unity.Transforms;
 using UnityEngine;
 
 namespace Metal.Authoring {
@@ -27,7 +22,6 @@ namespace Metal.Authoring {
         public float damperStiffness = 3000.0f;
         public float accelerationForce = 25.0f;
         public float maxSpeed = 100.0f;
-        public float decelerationForce = 10.0f;
         public Transform accelerationPoint;
         public float movementDeadzone = 0.1f;
         public float steerStrength = 30.0f;
@@ -55,19 +49,15 @@ namespace Metal.Authoring {
                 damperStiffness = authoring.damperStiffness,
                 accelerationForce = authoring.accelerationForce,
                 maxSpeed = authoring.maxSpeed,
-                decelerationForce = authoring.decelerationForce,
+                accelerationPointOffset = authoring.accelerationPoint.position,
                 movementDeadzone = authoring.movementDeadzone,
                 steerStrength = authoring.steerStrength,
+                turningCurve = authoring.turningCurveValue,
                 dragCoefficient = authoring.dragCoefficient,
-                accelerationPointOffset = authoring.accelerationPoint.position,
                 enableAcceleration = true,
                 enableSteering = true,
                 enableDrag = true,
                 enableSuspension = true,
-                enableForceAngular = true,
-                enableForceLinear = true,
-                turningCurve = authoring.turningCurveValue,
-                suspensionMultiplier = 1.0f
             });
             
             DynamicBuffer<WheelEntity> wheelEntities = AddBuffer<WheelEntity>(vehicle);
