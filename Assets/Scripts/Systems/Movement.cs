@@ -23,18 +23,14 @@ namespace Metal.Systems {
         private EntityQuery vehicleQuery;
         private CollisionWorld collisionWorld;
         private ComponentLookup<LocalTransform> transformLookup;
-        private ComponentLookup<Parent> parentLookup;
-        private ComponentLookup<PostTransformMatrix> scaleLookup;
-        //private ComponentLookup<PhysicsVelocity> velocityLookup;
         private BufferLookup<Authoring.WheelEntity> wheelEntitiesLookup;
+        private const float fixedDeltaTime = 1.0f / 60.0f;
         
         public void OnCreate(ref SystemState state) {
             state.RequireForUpdate<Components.Tick>();
             state.RequireForUpdate<PhysicsWorldSingleton>();
             state.RequireForUpdate<Components.Input>();
             transformLookup = state.GetComponentLookup<LocalTransform>();
-            parentLookup = state.GetComponentLookup<Parent>();
-            scaleLookup = state.GetComponentLookup<PostTransformMatrix>();
             wheelEntitiesLookup = state.GetBufferLookup<Authoring.WheelEntity>();
         }
 
@@ -44,25 +40,21 @@ namespace Metal.Systems {
 
         public void OnUpdate(ref SystemState state) {
             transformLookup.Update(ref state);
-            parentLookup.Update(ref state);
-            scaleLookup.Update(ref state);
             wheelEntitiesLookup.Update(ref state);
             
             state.Dependency = new VehicleJob {
                 physicsWorld = SystemAPI.GetSingleton<PhysicsWorldSingleton>().PhysicsWorld,
                 transformLookup = transformLookup,
                 wheelEntitiesLookup = wheelEntitiesLookup,
-                parentLookup = parentLookup,
-                scaleLookup = scaleLookup,
                 inputDirection = SystemAPI.GetSingleton<Components.Input>().movement,
-                deltaTime = SystemAPI.Time.DeltaTime,
-                fixedDeltaTime = SystemAPI.Time.fixedDeltaTime,
+                //deltaTime = SystemAPI.Time.DeltaTime,
+                fixedDeltaTime = fixedDeltaTime,
                 wheelCollisionFilter = new CollisionFilter {
                     BelongsTo = CollisionFilter.Default.BelongsTo, 
                     CollidesWith = ~(uint)CollisionLayer.vehicle,
                     GroupIndex = CollisionFilter.Default.GroupIndex,
                 },
-                fixedFrameCount = SystemAPI.GetSingleton<Components.Tick>().value
+                //fixedFrameCount = SystemAPI.GetSingleton<Components.Tick>().value
             }.Schedule(state.Dependency);
         }
 
@@ -74,50 +66,42 @@ namespace Metal.Systems {
 
     [BurstCompile]
     public partial struct VehicleJob : IJobEntity {
-        public PhysicsWorld physicsWorld;
+        [ReadOnly] public PhysicsWorld physicsWorld;
         [ReadOnly] public ComponentLookup<LocalTransform> transformLookup;
-        [ReadOnly] public ComponentLookup<Parent> parentLookup;
-        [ReadOnly] public ComponentLookup<PostTransformMatrix> scaleLookup;
         [ReadOnly] public BufferLookup<Authoring.WheelEntity> wheelEntitiesLookup;
         [ReadOnly] public float3 inputDirection;
-        [ReadOnly] public float deltaTime;
+        //[ReadOnly] public float deltaTime;
         [ReadOnly] public float fixedDeltaTime;
         [ReadOnly] public CollisionFilter wheelCollisionFilter;
-        [ReadOnly] public bool enableForceLinear;
-        [ReadOnly] public bool enableForceAngular;
-        [ReadOnly] public float3 linearVelocity;
-        [ReadOnly] public float3 angularVelocity;
-        [ReadOnly] public float3 vehicleWorldPosition;
-        [ReadOnly] public float3 vehicleCenterOfMass;
-        [ReadOnly] public float vehicleInverseMass;
-        [ReadOnly] public float3 vehicleInverseInertia;
-        [ReadOnly] public uint fixedFrameCount;
+        [ReadOnly] public float3 linearVelocityAccumulated;
+        [ReadOnly] public float3 angularVelocityAccumulated;
+        //[ReadOnly] public float3 vehicleWorldPosition;
+        //[ReadOnly] public float3 vehicleWorldCenterOfMass;
+        //[ReadOnly] public float vehicleInverseMass;
+        //[ReadOnly] public float3 vehicleInverseInertia;
+        //[ReadOnly] public uint fixedFrameCount;
         
         [BurstCompile]
-        public void Execute(
-            Entity vehicleEntity, 
+        public void Execute(Entity vehicleEntity,
             RefRO<Components.Vehicle> vehicle,
-            RefRO<LocalTransform> vehicleTransform, 
             RefRO<PhysicsMass> vehicleMass, 
             RefRW<PhysicsVelocity> vehicleVelocity) {
             
-            enableForceLinear = vehicle.ValueRO.enableForceLinear;
-            enableForceAngular = vehicle.ValueRO.enableForceAngular;
-            vehicleInverseMass = vehicleMass.ValueRO.InverseMass;
-            vehicleInverseInertia = vehicleMass.ValueRO.InverseInertia;
+            
             
             // assumed vehicle is a uniformly scaled orphan object, so TransformHelpers.ComputeWorldTransformMatrix is not needed
             float4x4 vehicleTransformMatrix = transformLookup[vehicleEntity].ToMatrix();
-            vehicleWorldPosition = vehicleTransformMatrix.c3.xyz;
-            vehicleCenterOfMass = vehicleTransformMatrix.TransformPoint(vehicleMass.ValueRO.CenterOfMass);
+            //float3 vehicleWorldPosition = vehicleTransformMatrix.c3.xyz;
+            float3 vehicleWorldCenterOfMass = vehicleTransformMatrix.TransformPoint(vehicleMass.ValueRO.CenterOfMass);
             quaternion vehicleWorldRotation = vehicleTransformMatrix.Rotation();
-            quaternion wheelWorldRotation = vehicleWorldRotation;
+            //quaternion wheelWorldRotation = vehicleWorldRotation;
             float3 vehicleWorldUp = vehicleTransformMatrix.Up();
             float3 wheelWorldUp = vehicleWorldUp;
             float3 vehicleWorldRight = vehicleTransformMatrix.Right();
-            float3 wheelWorldRight = vehicleWorldRight;
+            //float3 wheelWorldRight = vehicleWorldRight;
             float3 vehicleWorldForward = vehicleTransformMatrix.Forward();
-            float3 wheelWorldForward = vehicleWorldForward;
+            //float3 wheelWorldForward = vehicleWorldForward;
+            
             DynamicBuffer<Authoring.WheelEntity> wheelEntities = wheelEntitiesLookup[vehicleEntity];
             int groundedWheels = 0;
             
@@ -133,25 +117,38 @@ namespace Metal.Systems {
                 };
                 
                 bool wheelRaycastHit = physicsWorld.CastRay(ray, out RaycastHit hitData);
-                float wheelRaycastHitDistance = wheelRaycastHit ? math.distance(wheelWorldPosition, hitData.Position) : 0.0f;
                 
                 if (!wheelRaycastHit) continue;
+                
+                float wheelRaycastHitDistance = math.distance(wheelWorldPosition, hitData.Position);
                 
                 groundedWheels++;
                 
                 if (vehicle.ValueRO.enableSuspension) {
-                    float3 wheelWorldVelocity = GetPointVelocity(wheelWorldPosition, vehicleVelocity.ValueRO.Angular, vehicleVelocity.ValueRO.Linear);
-     
-                    float springCurrentLength = wheelRaycastHitDistance - vehicle.ValueRO.wheelRadius;
-                    float springCompression = (vehicle.ValueRO.restLength - springCurrentLength) / vehicle.ValueRO.springTravel;
-                    float springVelocity = math.dot(wheelWorldVelocity, wheelWorldUp);
-                    float dampForce = vehicle.ValueRO.damperStiffness * springVelocity;
-                    float springForce = vehicle.ValueRO.springStiffness * springCompression;
-                    float netForce = springForce - dampForce;
-                        
-                    AddForceAtPosition(netForce * wheelWorldUp * vehicle.ValueRO.suspensionMultiplier, wheelWorldPosition);
-                }
+                    //float3 wheelWorldVelocity = GetPointVelocity(wheelWorldPosition, vehicleVelocity.ValueRO.Angular, vehicleVelocity.ValueRO.Linear);
 
+                    float suspensionForce = vehicle.ValueRO.springStiffness * 
+                                ((vehicle.ValueRO.restLength - (math.distance(wheelWorldPosition, hitData.Position) - vehicle.ValueRO.wheelRadius)) / vehicle.ValueRO.springTravel)
+                               - 
+                               vehicle.ValueRO.damperStiffness * 
+                               math.dot(GetPointVelocity(wheelWorldPosition, vehicleVelocity.ValueRO.Angular, vehicleVelocity.ValueRO.Linear, vehicleWorldCenterOfMass), wheelWorldUp);
+                    
+                    // float springCurrentLength = wheelRaycastHitDistance - vehicle.ValueRO.wheelRadius;
+                    // float springCompression = (vehicle.ValueRO.restLength - springCurrentLength) / vehicle.ValueRO.springTravel;
+                    // float springVelocity = math.dot(wheelWorldVelocity, wheelWorldUp);
+                    // float dampForce = vehicle.ValueRO.damperStiffness * springVelocity;
+                    // float springForce = vehicle.ValueRO.springStiffness * springCompression;
+                    // float netForce = springForce - dampForce;
+                        
+                    AddForceAtPosition(
+                        ref linearVelocityAccumulated,
+                        ref angularVelocityAccumulated,
+                        suspensionForce * wheelWorldUp,
+                        wheelWorldPosition,
+                        vehicleMass.ValueRO.InverseMass,
+                        vehicleMass.ValueRO.InverseInertia,
+                        vehicleWorldCenterOfMass);
+                }
                 //UnityEngine.Debug.DrawLine(ray.Start, ray.End);
             }
 
@@ -165,9 +162,23 @@ namespace Metal.Systems {
                 float3 accelForce = vehicleWorldForward * inputDirection.z;
                 
                 if (vehicle.ValueRO.enableAcceleration) {
-                    AddForceAtPosition(accelForce * vehicle.ValueRO.accelerationForce, accelerationPoint,
+                    AddForceAtPosition(
+                        ref linearVelocityAccumulated,
+                        ref angularVelocityAccumulated,
+                        accelForce * vehicle.ValueRO.accelerationForce, 
+                        accelerationPoint,
+                        vehicleMass.ValueRO.InverseMass,
+                        vehicleMass.ValueRO.InverseInertia,
+                        vehicleWorldCenterOfMass,
                         ForceMode.Acceleration);
-                    AddForceAtPosition(accelForce * -1.0f * vehicle.ValueRO.decelerationForce, accelerationPoint,
+                    AddForceAtPosition(
+                        ref linearVelocityAccumulated,
+                        ref angularVelocityAccumulated,
+                        accelForce * -1.0f * vehicle.ValueRO.decelerationForce, 
+                        accelerationPoint,
+                        vehicleMass.ValueRO.InverseMass,
+                        vehicleMass.ValueRO.InverseInertia,
+                        vehicleWorldCenterOfMass,
                         ForceMode.Acceleration);
                 }
                 
@@ -176,15 +187,13 @@ namespace Metal.Systems {
                 #region Steering
                 
                 bool isMoving = inputDirection.x >= vehicle.ValueRO.movementDeadzone || inputDirection.x <= -vehicle.ValueRO.movementDeadzone;
-                bool isMovingRight = inputDirection.z > 0.0f;
+                //bool isMovingRight = inputDirection.z > 0.0f;
 
                 if (isMoving && vehicle.ValueRO.enableSteering) {
                     AddRelativeTorque(
-                        (vehicle.ValueRO.steerStrength * 
-                         inputDirection.x * 
-                         vehicle.ValueRO.turningCurve *
-                         math.sign(carVelocityRatio)) *
-                        vehicleWorldUp,
+                        ref angularVelocityAccumulated,
+                        (vehicle.ValueRO.steerStrength * inputDirection.x * vehicle.ValueRO.turningCurve * math.sign(carVelocityRatio)) * vehicleWorldUp,
+                        vehicleMass.ValueRO.InverseInertia,
                         ForceMode.Acceleration);
                 }
                 #endregion
@@ -197,41 +206,88 @@ namespace Metal.Systems {
                 //Log.Debug($"Drag +{ dragForce }");
                 
                 if (vehicle.ValueRO.enableDrag) { 
-                    AddForceAtPosition(dragForce,
-                        vehicleCenterOfMass,
+                    AddForceAtPosition(
+                        ref linearVelocityAccumulated,
+                        ref angularVelocityAccumulated,
+                        dragForce,
+                        vehicleWorldCenterOfMass,
+                        vehicleMass.ValueRO.InverseMass,
+                        vehicleMass.ValueRO.InverseInertia,
+                        vehicleWorldCenterOfMass,
                         ForceMode.Acceleration);
                 }
                 #endregion
             }
-            
-            vehicleVelocity.ValueRW.SetAngularVelocityWorldSpace(vehicleMass.ValueRO, vehicleWorldRotation, vehicleVelocity.ValueRO.Angular + angularVelocity);
-            vehicleVelocity.ValueRW.Linear += linearVelocity;
+            vehicleVelocity.ValueRW.SetAngularVelocityWorldSpace(vehicleMass.ValueRO, vehicleWorldRotation, vehicleVelocity.ValueRO.Angular + angularVelocityAccumulated);
+            vehicleVelocity.ValueRW.Linear += linearVelocityAccumulated;
         }
         
+        // [BurstCompile]
+        // public void AddForceAtPosition(in float3 force, in float3 forcePosition, in ForceMode mode = ForceMode.Force) {
+        //     linearVelocityAccumulated += mode switch {
+        //         ForceMode.Force => force * vehicleMass.ValueRO.InverseMass * fixedDeltaTime,
+        //         ForceMode.Acceleration => force * fixedDeltaTime,
+        //         _ => throw new NotImplementedException()
+        //     };
+        //     AddRelativeTorque(math.cross(forcePosition - vehicleWorldCenterOfMass, force), mode);
+        // }
+        
         [BurstCompile]
-        public void AddForceAtPosition(in float3 force, in float3 forcePosition, in ForceMode mode = ForceMode.Force) {
+        public void AddForceAtPosition(
+            ref float3 linearVelocity,
+            ref float3 angularVelocity,
+            in float3 force,
+            in float3 forceWorldPosition,
+            in float inverseMass,
+            in float3 inverseInertia,
+            in float3 rigidbodyWorldCenterOfMass,
+            in ForceMode mode = ForceMode.Force) {
             linearVelocity += mode switch {
-                ForceMode.Force => force * vehicleInverseMass * fixedDeltaTime,
+                ForceMode.Force => force * inverseMass * fixedDeltaTime,
                 ForceMode.Acceleration => force * fixedDeltaTime,
                 _ => throw new NotImplementedException()
             };
-            AddRelativeTorque(math.cross(forcePosition - vehicleCenterOfMass, force), mode);
+            AddRelativeTorque(
+                ref angularVelocity,
+                math.cross(forceWorldPosition - rigidbodyWorldCenterOfMass, force),
+                inverseInertia,
+                mode);
         }
 
+        // [BurstCompile]
+        // public void AddRelativeTorque(in float3 torque, in ForceMode mode = ForceMode.Force)
+        //     => angularVelocityAccumulated += mode switch {
+        //         ForceMode.Force => torque * vehicleMass.ValueRO.InverseInertia * fixedDeltaTime,
+        //         ForceMode.Acceleration => torque * fixedDeltaTime,
+        //         _ => throw new NotImplementedException()
+        //     };
+        
         [BurstCompile]
-        public void AddRelativeTorque(in float3 torque, in ForceMode mode = ForceMode.Force)
+        public void AddRelativeTorque(
+            ref float3 angularVelocity,
+            in float3 torque, 
+            in float3 inverseInertia, 
+            in ForceMode mode = ForceMode.Force)
             => angularVelocity += mode switch {
-                ForceMode.Force => torque * vehicleInverseInertia * fixedDeltaTime,
+                ForceMode.Force => torque * inverseInertia * fixedDeltaTime,
                 ForceMode.Acceleration => torque * fixedDeltaTime,
                 _ => throw new NotImplementedException()
             };
 
+        // [BurstCompile]
+        // public float3 GetPointVelocity(in float3 point, in float3 currentAngularVelocity, in float3 currentLinearVelocity) {
+        //     float3 r = point - vehicleWorldPosition;
+        //     float3 angularContribution = math.cross(currentAngularVelocity, r);
+        //     return currentLinearVelocity + angularContribution;
+        // }
+        
         [BurstCompile]
-        public float3 GetPointVelocity(in float3 point, in float3 currentAngularVelocity, in float3 currentLinearVelocity) {
-            float3 r = point - vehicleWorldPosition;
-            float3 angularContribution = math.cross(currentAngularVelocity, r);
-            return currentLinearVelocity + angularContribution;
-        }
+        public float3 GetPointVelocity(
+            in float3 worldPoint,
+            in float3 currentAngularVelocity,
+            in float3 currentLinearVelocity,
+            in float3 rigidbodyWorldCenterOfMass) =>
+            currentLinearVelocity + math.cross(currentAngularVelocity, worldPoint - rigidbodyWorldCenterOfMass);
     }
 
 
