@@ -1,3 +1,5 @@
+using System.Linq;
+using Unity.Collections;
 using Unity.Entities;
 using UnityEngine;
 
@@ -41,6 +43,17 @@ namespace Metal.Authoring {
             Entity vehicle = GetEntity(TransformUsageFlags.Dynamic);
             Entity vehicleAsset = GetEntity(authoring.vehicleAssets.dict[authoring.vehicleType], TransformUsageFlags.Dynamic);
             AddComponent<Components.Movement>(vehicle);
+
+            int turningCurveSampleCount = 64;
+            int turningCurvePointCount = turningCurveSampleCount + authoring.turningCurve.keys.Length;
+            var blobBuilder = new BlobBuilder(Allocator.Temp);
+            ref FloatArrayBlob blob = ref blobBuilder.ConstructRoot<FloatArrayBlob>();
+            BlobBuilderArray<float> arrayBuilder = blobBuilder.Allocate(ref blob.value, turningCurvePointCount, sizeof(float));
+            float[] points = authoring.turningCurve.ToPointArray(turningCurveSampleCount);
+            for (int i = 0; i < turningCurvePointCount - 1; i++) {
+                arrayBuilder[i] = points[i];
+            }
+            
             AddComponent(vehicle, new Components.Vehicle {
                 restLength = authoring.restLength,
                 springTravel = authoring.springTravel,
@@ -52,13 +65,16 @@ namespace Metal.Authoring {
                 accelerationPointOffset = authoring.accelerationPoint.position,
                 movementDeadzone = authoring.movementDeadzone,
                 steerStrength = authoring.steerStrength,
-                turningCurve = authoring.turningCurveValue,
+                turningCurveValue = authoring.turningCurveValue,
+                turningCurve = blobBuilder.CreateBlobAssetReference<FloatArrayBlob>(Allocator.Persistent),
                 dragCoefficient = authoring.dragCoefficient,
                 enableAcceleration = true,
                 enableSteering = true,
                 enableDrag = true,
                 enableSuspension = true,
             });
+            
+            blobBuilder.Dispose();
             
             DynamicBuffer<WheelEntity> wheelEntities = AddBuffer<WheelEntity>(vehicle);
             wheelEntities.EnsureCapacity(authoring.wheelTransforms.Length);

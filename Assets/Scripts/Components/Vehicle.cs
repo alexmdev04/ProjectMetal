@@ -14,15 +14,21 @@ namespace Metal.Components {
             movementDeadzone,
             steerStrength,
             dragCoefficient,
-            turningCurve;
-
+            turningCurveValue;
+        
         public bool
             enableSuspension, 
             enableAcceleration, 
             enableSteering, 
             enableDrag;
 
+        public BlobAssetReference<FloatArrayBlob> turningCurve;
+        
         public float3 accelerationPointOffset;
         //private AnimationCurve turningCurve;
     }
+}
+
+public struct FloatArrayBlob {
+    public BlobArray<float> value;
 }
