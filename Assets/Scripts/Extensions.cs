@@ -1,11 +1,14 @@
 using System;
+using System.Collections.Generic;
 using Unity.Burst;
 using Unity.Entities;
 using Unity.Physics;
 using Unity.Mathematics;
 using Unity.Transforms;
 using Unity.Collections;
-using Unity.Physics.Extensions;
+using System.Linq;
+using UnityEngine;
+using ForceMode = Unity.Physics.Extensions.ForceMode;
 
 namespace Metal {
     [BurstCompile]
@@ -222,5 +225,44 @@ namespace Metal {
                 ForceMode.Acceleration => torque * fixedDeltaTime,
                 _ => throw new NotImplementedException()
             };
+        
+        public static float[] ToPointArray(this UnityEngine.AnimationCurve graph, int sampleCount) {
+            float sampleStep = 1.0f / sampleCount;
+            
+            List<Keyframe> sampledPoints = new (sampleCount);
+            for (int i = 0; i < sampleCount; i++) {
+                float time = i * sampleStep;
+                sampledPoints.Add(new Keyframe(time, graph.Evaluate(time)));
+            }
+            
+            return graph.keys
+                .Concat(sampledPoints)
+                .OrderBy(element => element.time)
+                .Select(element => element.value)
+                .ToArray();
+        }
+
+        [BurstCompile]
+        public static float Evaluate(this ref BlobArray<float> points, float value) {
+            int highestIndex = points.Length - 1;
+            switch (value) {
+                case <= 0.0001f: {
+                    return points[0];
+                }
+                case >= 0.9999f: {
+                    return points[highestIndex];
+                }
+                default: {
+                    float decimalIndex = highestIndex * value; // identical to lerping with lower bound of 0
+                    int indexFloor = (int)decimalIndex;
+                    return math.lerp(points[indexFloor], points[indexFloor + 1], decimalIndex - indexFloor);
+                }
+            }
+        }
+        
+        public static float DivRem(float a, float b, out float remainder) {
+            remainder = a % b;
+            return a / b;
+        }
     }
 }
