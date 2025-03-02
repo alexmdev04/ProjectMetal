@@ -1,6 +1,7 @@
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
+using Unity.Logging;
 using Unity.Mathematics;
 using Unity.Physics;
 using Unity.Physics.Extensions;
@@ -75,7 +76,8 @@ namespace Metal.Systems {
         //[ReadOnly] public uint fixedFrameCount;
         
         [BurstCompile]
-        public void Execute(Entity vehicleEntity,
+        public void Execute(
+            Entity vehicleEntity,
             RefRO<Components.Vehicle> vehicle,
             RefRO<PhysicsMass> vehicleMass, 
             RefRW<PhysicsVelocity> vehicleVelocity) {
@@ -84,16 +86,14 @@ namespace Metal.Systems {
             float4x4 vehicleTransformMatrix = transformLookup[vehicleEntity].ToMatrix();
             //float3 vehicleWorldPosition = vehicleTransformMatrix.c3.xyz;
             float3 vehicleWorldCenterOfMass = vehicleTransformMatrix.TransformPoint(vehicleMass.ValueRO.CenterOfMass);
-            quaternion vehicleWorldRotation = vehicleTransformMatrix.Rotation();
+            //quaternion vehicleWorldRotation = vehicleTransformMatrix.Rotation();
             //quaternion wheelWorldRotation = vehicleWorldRotation;
             float3 vehicleWorldUp = vehicleTransformMatrix.Up();
             float3 wheelWorldUp = vehicleWorldUp;
-            float3 vehicleWorldRight = vehicleTransformMatrix.Right();
+            //float3 vehicleWorldRight = vehicleTransformMatrix.Right();
             //float3 wheelWorldRight = vehicleWorldRight;
-            float3 vehicleWorldForward = vehicleTransformMatrix.Forward();
+            //float3 vehicleWorldForward = vehicleTransformMatrix.Forward();
             //float3 wheelWorldForward = vehicleWorldForward;
-            
-            #region Wheel Init & Suspension
             
             DynamicBuffer<Authoring.WheelEntity> wheelEntities = wheelEntitiesLookup[vehicleEntity];
             
@@ -112,93 +112,84 @@ namespace Metal.Systems {
                 
                 groundedWheels++;
 
-                #region Suspension
+                // Suspension
                 
-                if (vehicle.ValueRO.enableSuspension) {
-                    Extensions.GetPointVelocity(
-                        vehicleVelocity.ValueRO.Linear,
-                        vehicleVelocity.ValueRO.Angular,
-                        vehicleWorldCenterOfMass,
-                        wheelWorldPosition,
-                        out float3 wheelWorldVelocity);
+                if (!vehicle.ValueRO.enableSuspension) { continue; }
+                
+                Extensions.GetPointVelocity(
+                    vehicleVelocity.ValueRO.Linear,
+                    vehicleVelocity.ValueRO.Angular,
+                    vehicleWorldCenterOfMass,
+                    wheelWorldPosition,
+                    out float3 wheelWorldVelocity);
+                
+                float suspensionForce = 
+                    vehicle.ValueRO.springStiffness * 
+                    ((vehicle.ValueRO.restLength - (math.distance(wheelWorldPosition, hitData.Position) - vehicle.ValueRO.wheelRadius)) / vehicle.ValueRO.springTravel)
+                    - 
+                    vehicle.ValueRO.damperStiffness * 
+                    math.dot(wheelWorldVelocity, wheelWorldUp);
                     
-                    float suspensionForce = vehicle.ValueRO.springStiffness * 
-                                            ((vehicle.ValueRO.restLength - (math.distance(wheelWorldPosition, hitData.Position) - vehicle.ValueRO.wheelRadius)) / vehicle.ValueRO.springTravel)
-                                            - 
-                                            vehicle.ValueRO.damperStiffness * 
-                                            math.dot(wheelWorldVelocity, wheelWorldUp);
-                        
-                    Extensions.AddForceAtPosition(
-                        ref linearVelocityAccumulated,
-                        ref angularVelocityAccumulated,
-                        suspensionForce * wheelWorldUp,
-                        wheelWorldPosition,
-                        vehicleMass.ValueRO.InverseMass,
-                        vehicleMass.ValueRO.InverseInertia,
-                        vehicleWorldCenterOfMass);
-                }
-                
-                #endregion
+                Extensions.AddForceAtPosition(
+                    ref linearVelocityAccumulated,
+                    ref angularVelocityAccumulated,
+                    suspensionForce * wheelWorldUp,
+                    wheelWorldPosition,
+                    vehicleMass.ValueRO.InverseMass,
+                    vehicleMass.ValueRO.InverseInertia,
+                    vehicleWorldCenterOfMass);
             }
-            
-            #endregion
             
             float3 carLocalVelocity = vehicleTransformMatrix.InverseTransformDirection(vehicleVelocity.ValueRO.Linear);
             float carVelocityRatio = math.length(carLocalVelocity) / vehicle.ValueRO.maxSpeed;
-
-            #region Movement
-
-            if (groundedWheels > 1) {
-                #region Accel/Decel
-                
-                if (vehicle.ValueRO.enableAcceleration) {
-                    Extensions.AddForceAtPosition(
-                        ref linearVelocityAccumulated,
-                        ref angularVelocityAccumulated,
-                        vehicleWorldForward * inputDirection.z * vehicle.ValueRO.accelerationForce, 
-                        vehicleTransformMatrix.TransformPoint(vehicle.ValueRO.accelerationPointOffset),
-                        vehicleMass.ValueRO.InverseMass,
-                        vehicleMass.ValueRO.InverseInertia,
-                        vehicleWorldCenterOfMass,
-                        ForceMode.Acceleration);
-                }
-                
-                #endregion
-
-                #region Steering
-
-                if ((inputDirection.x >= vehicle.ValueRO.movementDeadzone || inputDirection.x <= vehicle.ValueRO.movementDeadzone * -1.0f) &&
-                    vehicle.ValueRO.enableSteering) {
-                    Extensions.AddRelativeTorque(
-                        ref angularVelocityAccumulated,
-                        (vehicle.ValueRO.steerStrength * inputDirection.x * vehicle.ValueRO.turningCurve * math.sign(carVelocityRatio)) * vehicleWorldUp,
-                        vehicleMass.ValueRO.InverseInertia,
-                        ForceMode.Acceleration);
-                }
-                #endregion
-                
-                #region Sideways Drag
-                
-                if (vehicle.ValueRO.enableDrag) { 
-                    Extensions.AddForceAtPosition(
-                        ref linearVelocityAccumulated,
-                        ref angularVelocityAccumulated,
-                        vehicleWorldRight * (carLocalVelocity.x * -1.0f * vehicle.ValueRO.dragCoefficient),
-                        vehicleWorldCenterOfMass,
-                        vehicleMass.ValueRO.InverseMass,
-                        vehicleMass.ValueRO.InverseInertia,
-                        vehicleWorldCenterOfMass,
-                        ForceMode.Acceleration);
-                }
-                #endregion
-            }
-            else {
-                return;
-            }
-
-            #endregion
             
-            vehicleVelocity.ValueRW.SetAngularVelocityWorldSpace(vehicleMass.ValueRO, vehicleWorldRotation, vehicleVelocity.ValueRO.Angular + angularVelocityAccumulated);
+            if (groundedWheels <= 1) { return; }
+
+            // Accel/Decel
+
+            if (vehicle.ValueRO.enableAcceleration) {
+                Extensions.AddForceAtPosition(
+                    ref linearVelocityAccumulated,
+                    ref angularVelocityAccumulated,
+                    vehicleTransformMatrix.Forward() * inputDirection.z * vehicle.ValueRO.accelerationForce,
+                    vehicleTransformMatrix.TransformPoint(vehicle.ValueRO.accelerationPointOffset),
+                    vehicleMass.ValueRO.InverseMass,
+                    vehicleMass.ValueRO.InverseInertia,
+                    vehicleWorldCenterOfMass,
+                    ForceMode.Acceleration);
+            }
+            
+            // Steering
+            
+            if ((inputDirection.x >= vehicle.ValueRO.movementDeadzone ||
+                 inputDirection.x <= vehicle.ValueRO.movementDeadzone * -1.0f) &&
+                vehicle.ValueRO.enableSteering) {
+                Extensions.AddRelativeTorque(
+                    ref angularVelocityAccumulated,
+                    (vehicle.ValueRO.steerStrength * 
+                        inputDirection.x * 
+                        vehicle.ValueRO.turningCurve.Value.value.Evaluate(math.abs(carVelocityRatio)) *
+                        math.sign(carVelocityRatio)) * 
+                        vehicleWorldUp,
+                    vehicleMass.ValueRO.InverseInertia,
+                    ForceMode.Acceleration);
+            }
+            
+            // Sideways Drag
+
+            if (vehicle.ValueRO.enableDrag) {
+                Extensions.AddForceAtPosition(
+                    ref linearVelocityAccumulated,
+                    ref angularVelocityAccumulated,
+                    vehicleTransformMatrix.Right() * (carLocalVelocity.x * -1.0f * vehicle.ValueRO.dragCoefficient),
+                    vehicleWorldCenterOfMass,
+                    vehicleMass.ValueRO.InverseMass,
+                    vehicleMass.ValueRO.InverseInertia,
+                    vehicleWorldCenterOfMass,
+                    ForceMode.Acceleration);
+            }
+            
+            vehicleVelocity.ValueRW.SetAngularVelocityWorldSpace(vehicleMass.ValueRO, vehicleTransformMatrix.Rotation(), vehicleVelocity.ValueRO.Angular + angularVelocityAccumulated);
             vehicleVelocity.ValueRW.Linear += linearVelocityAccumulated;
         }
     }
