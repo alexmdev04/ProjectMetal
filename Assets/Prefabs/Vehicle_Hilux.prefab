@@ -115,13 +115,57 @@ MonoBehaviour:
   damperStiffness: 3000
   accelerationForce: 25
   maxSpeed: 100
-  decelerationForce: 10
   accelerationPoint: {fileID: 8496959132932221569}
   movementDeadzone: 0.1
   steerStrength: 30
   turningCurve:
     serializedVersion: 2
-    m_Curve: []
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 2.0943396
+      outSlope: 2.0943396
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 1
+    - serializedVersion: 3
+      time: 0.016460689
+      value: 0.033051323
+      inSlope: 2.1817076
+      outSlope: 2.1817076
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.13706696
+    - serializedVersion: 3
+      time: 0.07669894
+      value: 0.40907675
+      inSlope: 2.0170553
+      outSlope: 2.0170553
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    - serializedVersion: 3
+      time: 0.68673635
+      value: 0.9982942
+      inSlope: 0.010187913
+      outSlope: 0.010187913
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.4359088
+    - serializedVersion: 3
+      time: 0.9999979
+      value: 0.8419796
+      inSlope: -0.16724852
+      outSlope: -0.16724852
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.58523375
+      outWeight: 0
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
