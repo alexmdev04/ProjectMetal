@@ -48,20 +48,10 @@ namespace Metal.Systems {
 
     [BurstCompile]
     internal partial struct PlayerJob : IJobEntity { 
-        //[ReadOnly] public float deltaTime;
         [ReadOnly] public float3 movementInput;
         [BurstCompile]
-        // private void Execute(ref LocalTransform transform, in Tags.Player player) {
-        //     float2 movement = movementInput * 10.0f * deltaTime;
-        //     transform.Position.x += movement.x;
-        //     transform.Position.z += movement.y;
-        //     if (math.lengthsq(movementInput) > float.Epsilon) {
-        //         float3 forwardDir = new float3(movementInput.x, 0.0f, movementInput.y);
-        //         transform.Rotation = quaternion.LookRotation(forwardDir, math.up());
-        //     }
-        // }
-        private void Execute(ref Components.Movement movement, in Tags.Controller.Player filter1) {
-            movement.direction = movementInput;
+        private void Execute(RefRW<Components.Movement> movement, in Tags.Controller.Player filter1) {
+            movement.ValueRW.input = movementInput;
         }
     }
 
@@ -69,9 +59,8 @@ namespace Metal.Systems {
     internal partial struct PathedJob : IJobEntity {
         [ReadOnly] public float3 playerPos;
         [BurstCompile]
-        private void Execute(ref LocalTransform transform, ref Components.Movement movement, in Tags.Controller.Pathed filter1) {
-            movement.direction = math.normalize(-(transform.Position - playerPos));
-            // movement.speed should be max
+        private void Execute(RefRO<LocalTransform> transform, RefRW<Components.Movement> movement, in Tags.Controller.Pathed filter1) {
+            movement.ValueRW.input = math.normalize(-(transform.ValueRO.Position - playerPos));
         }
     }
 }
