@@ -5,12 +5,14 @@ using Unity.Logging;
 using Unity.Mathematics;
 using Unity.Physics;
 using Unity.Physics.Extensions;
+using Unity.Scenes;
 using Unity.Transforms;
 using RaycastHit = Unity.Physics.RaycastHit;
 namespace Metal.Systems {
     /// <summary>
     /// Executes calculations to move an entity, the entity must have a movement tag (e.g. Tags.Movement.Vehicle)
     /// </summary>
+    [BurstCompile]
     [UpdateInGroup(typeof(FixedStepSimulationSystemGroup))]
     public partial struct Movement : ISystem, ISystemStartStop {
         public enum CollisionLayer {
@@ -18,25 +20,39 @@ namespace Metal.Systems {
             ground = 1 << 0,
             vehicle = 1 << 1
         }
+
+        private Entity root;
         private EntityQuery vehicleQuery;
         private CollisionWorld collisionWorld;
         private ComponentLookup<LocalTransform> transformLookup;
         private BufferLookup<Authoring.WheelEntity> wheelEntitiesLookup;
         private const float fixedDeltaTime = 1.0f / 60.0f;
         
+        [BurstCompile]
         public void OnCreate(ref SystemState state) {
-            state.RequireForUpdate<Components.Tick>();
+            //state.RequireForUpdate<Components.Tick>();
             state.RequireForUpdate<PhysicsWorldSingleton>();
             state.RequireForUpdate<Components.Input>();
+            state.RequireForUpdate<Tags.Root>();
             transformLookup = state.GetComponentLookup<LocalTransform>();
             wheelEntitiesLookup = state.GetBufferLookup<Authoring.WheelEntity>();
         }
 
+        [BurstCompile]
         public void OnStartRunning(ref SystemState state) {
-            
+            root = SystemAPI.GetSingletonEntity<Tags.Root>();
         }
 
+        [BurstCompile]
         public void OnUpdate(ref SystemState state) {
+            RefRO<Components.Input> input = SystemAPI.GetComponentRO<Components.Input>(root);
+            if (input.ValueRO.ability1.isPressed || input.ValueRO.ability2.wasPressedThisFrame) {
+                EntityCommandBuffer ecb = new (Allocator.Temp);
+                ecb.Instantiate(input.ValueRO.debugVehiclePrefab);
+                ecb.Playback(state.EntityManager);
+                ecb.Dispose();
+            }
+            
             transformLookup.Update(ref state);
             wheelEntitiesLookup.Update(ref state);
             
@@ -44,7 +60,7 @@ namespace Metal.Systems {
                 physicsWorld = SystemAPI.GetSingleton<PhysicsWorldSingleton>().PhysicsWorld,
                 transformLookup = transformLookup,
                 wheelEntitiesLookup = wheelEntitiesLookup,
-                inputDirection = SystemAPI.GetSingleton<Components.Input>().movement,
+                //inputDirection = SystemAPI.GetSingleton<Components.Input>().movement,
                 //deltaTime = SystemAPI.Time.DeltaTime,
                 fixedDeltaTime = fixedDeltaTime,
                 wheelCollisionFilter = new CollisionFilter {
@@ -54,8 +70,14 @@ namespace Metal.Systems {
                 },
                 //fixedFrameCount = SystemAPI.GetSingleton<Components.Tick>().value
             }.ScheduleParallel();
+
+            new HumanoidJob {
+                deltaTime = SystemAPI.Time.DeltaTime,
+                speed = 10.0f
+            }.ScheduleParallel();
         }
 
+        [BurstCompile]
         public void OnStopRunning(ref SystemState state) {
             
         }
@@ -67,7 +89,7 @@ namespace Metal.Systems {
         [ReadOnly] public PhysicsWorld physicsWorld;
         [ReadOnly] public ComponentLookup<LocalTransform> transformLookup;
         [ReadOnly] public BufferLookup<Authoring.WheelEntity> wheelEntitiesLookup;
-        [ReadOnly] public float3 inputDirection;
+        //[ReadOnly] public float3 inputDirection;
         //[ReadOnly] public float deltaTime;
         [ReadOnly] public float fixedDeltaTime;
         [ReadOnly] public CollisionFilter wheelCollisionFilter;
@@ -80,20 +102,15 @@ namespace Metal.Systems {
             Entity vehicleEntity,
             RefRO<Components.Vehicle> vehicle,
             RefRO<PhysicsMass> vehicleMass, 
-            RefRW<PhysicsVelocity> vehicleVelocity) {
-            
+            RefRW<PhysicsVelocity> vehicleVelocity,
+            RefRO<Components.Movement> movement) {
+
+            float3 inputDirection = movement.ValueRO.input;
             // assumed vehicle is a uniformly scaled orphan object, so TransformHelpers.ComputeWorldTransformMatrix is not needed
             float4x4 vehicleTransformMatrix = transformLookup[vehicleEntity].ToMatrix();
-            //float3 vehicleWorldPosition = vehicleTransformMatrix.c3.xyz;
             float3 vehicleWorldCenterOfMass = vehicleTransformMatrix.TransformPoint(vehicleMass.ValueRO.CenterOfMass);
-            //quaternion vehicleWorldRotation = vehicleTransformMatrix.Rotation();
-            //quaternion wheelWorldRotation = vehicleWorldRotation;
             float3 vehicleWorldUp = vehicleTransformMatrix.Up();
             float3 wheelWorldUp = vehicleWorldUp;
-            //float3 vehicleWorldRight = vehicleTransformMatrix.Right();
-            //float3 wheelWorldRight = vehicleWorldRight;
-            //float3 vehicleWorldForward = vehicleTransformMatrix.Forward();
-            //float3 wheelWorldForward = vehicleWorldForward;
             
             DynamicBuffer<Authoring.WheelEntity> wheelEntities = wheelEntitiesLookup[vehicleEntity];
             
@@ -191,6 +208,24 @@ namespace Metal.Systems {
             
             vehicleVelocity.ValueRW.SetAngularVelocityWorldSpace(vehicleMass.ValueRO, vehicleTransformMatrix.Rotation(), vehicleVelocity.ValueRO.Angular + angularVelocityAccumulated);
             vehicleVelocity.ValueRW.Linear += linearVelocityAccumulated;
+        }
+    }
+    
+    [BurstCompile]
+    public partial struct HumanoidJob : IJobEntity {
+        [ReadOnly] public float deltaTime;
+        [ReadOnly] public float speed;
+        [BurstCompile]
+        public void Execute(
+            RefRO<Components.Movement> movementInput,
+            RefRW<LocalTransform> transform,
+            in Tags.Movement.Humanoid filter1) {
+            
+            transform.ValueRW.Position += movementInput.ValueRO.input * speed * deltaTime;
+            if (!(math.lengthsq(movementInput.ValueRO.input.xz) > float.Epsilon)) { return; }
+            float3 forwardDir = movementInput.ValueRO.input;
+            forwardDir.y = 0.0f;
+            transform.ValueRW.Rotation = quaternion.LookRotation(forwardDir, math.up());
         }
     }
 }
