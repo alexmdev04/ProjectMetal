@@ -31,13 +31,11 @@ namespace Metal.Systems {
         [BurstCompile]
         public void OnUpdate(ref SystemState state) {
             new PlayerJob {
-                //deltaTime = SystemAPI.Time.DeltaTime,
                 movementInput = SystemAPI.GetComponentRO<Components.Input>(root).ValueRO.movement
-            }.Schedule();
+            }.ScheduleParallel();
             new PathedJob {
                 playerPos = SystemAPI.GetComponentRO<LocalTransform>(player).ValueRO.Position,
-                //deltaTime = SystemAPI.Time.DeltaTime,
-            }.Schedule();
+            }.ScheduleParallel();
         }
 
         [BurstCompile]
