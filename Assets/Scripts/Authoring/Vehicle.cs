@@ -43,6 +43,7 @@ namespace Metal.Authoring {
             Entity vehicle = GetEntity(TransformUsageFlags.Dynamic);
             Entity vehicleAsset = GetEntity(authoring.vehicleAssets.dict[authoring.vehicleType], TransformUsageFlags.Dynamic);
             AddComponent<Components.Movement>(vehicle);
+            AddComponent<Tags.Controller.Player>(vehicle);
 
             int turningCurveSampleCount = 64;
             int turningCurvePointCount = turningCurveSampleCount + authoring.turningCurve.keys.Length;
