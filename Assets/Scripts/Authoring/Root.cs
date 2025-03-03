@@ -5,14 +5,21 @@ using UnityEngine;
 
 namespace Metal.Authoring {
     public class Root : MonoBehaviour {
-        
+        public GameObject debugVehiclePrefab;
     }
     
     public class RootBaker : Baker<Root> {
         public override void Bake(Root authoring) {
-            Entity root = GetEntity(TransformUsageFlags.None);
-            AddComponent<Components.Input>(root);
+            Entity debugVehiclePrefab = GetEntity(authoring.debugVehiclePrefab, TransformUsageFlags.Dynamic);
+            Entity root = GetEntity(TransformUsageFlags.WorldSpace);
+            
+            AddComponent(root, new Components.Input {
+                debugVehiclePrefab = debugVehiclePrefab
+            });
+            
             AddComponent<Tags.Root>(root);
+            
+            //AddComponent<Components.SharedBlobAssets>(root);
         }
     }
 }

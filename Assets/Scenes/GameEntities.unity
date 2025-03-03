@@ -1558,6 +1558,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a6b122d925ef471db020c9b7ca5261eb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  debugVehiclePrefab: {fileID: 1487978381505018285, guid: 4bf7fdede28bd34439bb43b941a4ccf8, type: 3}
 --- !u!4 &1579182666
 Transform:
   m_ObjectHideFlags: 0
