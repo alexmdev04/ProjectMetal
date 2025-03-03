@@ -9,7 +9,8 @@ namespace Metal.Systems {
     /// Sets movement component values, will only control entities with a controlled tag (e.g. Tags.Controller.Pathed)
     /// </summary>
     [BurstCompile]
-    [UpdateInGroup(typeof(SimulationSystemGroup))]
+    [UpdateInGroup(typeof(InitializationSystemGroup))]
+    [UpdateAfter(typeof(Input))]
     public partial struct Controller : ISystem, ISystemStartStop {
         private Entity
             root,

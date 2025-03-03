@@ -5,6 +5,7 @@ using Unity.Mathematics;
 
 namespace Metal.Systems {
     [UpdateInGroup(typeof(InitializationSystemGroup))]
+    [UpdateBefore(typeof(Controller))]
     public partial class Input : SystemBase {
         private GameInput input;
         
@@ -17,9 +18,6 @@ namespace Metal.Systems {
         }
 
         protected override void OnUpdate() {
-            // Entities.WithAll<Tags.Player>().ForEach((En ) => {
-            //     
-            // }).ScheduleParallel();
             if (UnityEngine.InputSystem.Keyboard.current.f5Key.wasPressedThisFrame) {
                 new DebugPlayerReset() { }.Schedule();
             }
