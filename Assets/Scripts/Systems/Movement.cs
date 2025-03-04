@@ -45,14 +45,6 @@ namespace Metal.Systems {
 
         [BurstCompile]
         public void OnUpdate(ref SystemState state) {
-            RefRO<Components.Input> input = SystemAPI.GetComponentRO<Components.Input>(root);
-            if (input.ValueRO.ability1.isPressed || input.ValueRO.ability2.wasPressedThisFrame) {
-                EntityCommandBuffer ecb = new (Allocator.Temp);
-                ecb.Instantiate(input.ValueRO.debugVehiclePrefab);
-                ecb.Playback(state.EntityManager);
-                ecb.Dispose();
-            }
-            
             transformLookup.Update(ref state);
             wheelEntitiesLookup.Update(ref state);
             

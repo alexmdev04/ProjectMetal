@@ -18,6 +18,10 @@ namespace Metal.Authoring {
             });
             
             AddComponent<Tags.Root>(root);
+
+            #if UNITY_EDITOR
+            AddComponent<Components.Debug>(root);
+            #endif
             
             //AddComponent<Components.SharedBlobAssets>(root);
         }
