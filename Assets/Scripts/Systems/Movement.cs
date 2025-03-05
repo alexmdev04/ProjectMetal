@@ -85,8 +85,6 @@ namespace Metal.Systems {
         //[ReadOnly] public float deltaTime;
         [ReadOnly] public float fixedDeltaTime;
         [ReadOnly] public CollisionFilter wheelCollisionFilter;
-        [ReadOnly] public float3 linearVelocityAccumulated;
-        [ReadOnly] public float3 angularVelocityAccumulated;
         //[ReadOnly] public uint fixedFrameCount;
         
         [BurstCompile]
@@ -97,6 +95,8 @@ namespace Metal.Systems {
             RefRW<PhysicsVelocity> vehicleVelocity,
             RefRO<Components.Movement> movement) {
 
+            float3 linearVelocityAccumulated = float3.zero;
+            float3 angularVelocityAccumulated = float3.zero;
             float3 inputDirection = movement.ValueRO.input;
             // assumed vehicle is a uniformly scaled orphan object, so TransformHelpers.ComputeWorldTransformMatrix is not needed
             float4x4 vehicleTransformMatrix = transformLookup[vehicleEntity].ToMatrix();
