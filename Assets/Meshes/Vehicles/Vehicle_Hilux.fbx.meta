@@ -3,7 +3,47 @@ guid: 88447fdbda0bed44789d9c48e1a5f6d8
 ModelImporter:
   serializedVersion: 22200
   internalIDToNameTable: []
-  externalObjects: {}
+  externalObjects:
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Hilux_Body
+    second: {fileID: 2100000, guid: c5431304de6582f4e8d5cc2cc3343386, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Hilux_Wheel_Inner
+    second: {fileID: 2100000, guid: b779c8283bcedab4d845da15ece6aed8, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Hilux_Wheel_Outer
+    second: {fileID: 2100000, guid: 3e721686f28605d42ad4fa6c32173268, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Hilux_pasted__lambert2SG
+    second: {fileID: 2100000, guid: 61e6319464bc32c48a464e6c53a94477, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Hilux_pasted__pasted__lambert2SG
+    second: {fileID: 2100000, guid: d1b1d7907536bfd4595b8aff87caa9f2, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: blinn2SG
+    second: {fileID: 2100000, guid: 7ac0fe549d385d2418807e4a8a4a28e8, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: blinn44SG
+    second: {fileID: 2100000, guid: 135533f8681be7a40983ab7c47956e6d, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: blinn49SG
+    second: {fileID: 2100000, guid: a903a9b81adb49542b7b85f6e49ed689, type: 2}
   materials:
     materialImportMode: 2
     materialName: 0

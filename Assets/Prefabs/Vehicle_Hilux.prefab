@@ -52,6 +52,18 @@ PrefabInstance:
       value: 1
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 88447fdbda0bed44789d9c48e1a5f6d8, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 88447fdbda0bed44789d9c48e1a5f6d8, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 88447fdbda0bed44789d9c48e1a5f6d8, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 88447fdbda0bed44789d9c48e1a5f6d8, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
       value: 0
       objectReference: {fileID: 0}
@@ -63,9 +75,29 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -1449852378230163304, guid: 88447fdbda0bed44789d9c48e1a5f6d8, type: 3}
+      propertyPath: m_Layer
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 887128031818518832, guid: 88447fdbda0bed44789d9c48e1a5f6d8, type: 3}
+      propertyPath: m_Layer
+      value: 2
+      objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 88447fdbda0bed44789d9c48e1a5f6d8, type: 3}
       propertyPath: m_Name
       value: Vehicle_Hilux
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 88447fdbda0bed44789d9c48e1a5f6d8, type: 3}
+      propertyPath: m_Layer
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 3212759395893331531, guid: 88447fdbda0bed44789d9c48e1a5f6d8, type: 3}
+      propertyPath: m_Layer
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 7622312368909821719, guid: 88447fdbda0bed44789d9c48e1a5f6d8, type: 3}
+      propertyPath: m_Layer
+      value: 2
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -113,7 +145,7 @@ MonoBehaviour:
   wheelRadius: 0.33
   springStiffness: 30000
   damperStiffness: 3000
-  accelerationForce: 25
+  accelerationForce: 15
   maxSpeed: 100
   accelerationPoint: {fileID: 8496959132932221569}
   movementDeadzone: 0.1
@@ -177,8 +209,8 @@ MonoBehaviour:
   m_MotionType: 0
   m_Smoothing: 1
   m_Mass: 1000
-  m_LinearDamping: 0.01
-  m_AngularDamping: 0.05
+  m_LinearDamping: 0.2
+  m_AngularDamping: 10
   m_InitialLinearVelocity:
     x: 0
     y: 0
@@ -232,7 +264,7 @@ MonoBehaviour:
     z: 0
   m_PrimitiveSize:
     x: 2.45
-    y: 0.85
+    y: 1
     z: 3.7
   m_PrimitiveOrientation:
     Value:
@@ -245,7 +277,7 @@ MonoBehaviour:
     Radius: 1.225
     Axis: 2
   m_Cylinder:
-    Height: 0.85
+    Height: 1
     Radius: 1.85
     Axis: 1
   m_CylinderSideCount: 20
