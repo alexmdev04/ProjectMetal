@@ -19,13 +19,13 @@ namespace Metal.Systems {
         [BurstCompile]
         public void OnCreate(ref SystemState state) {
             state.RequireForUpdate<Tags.Root>();
-            state.RequireForUpdate<Tags.Player>();
+            //state.RequireForUpdate<Tags.Player>();
         }
 
         [BurstCompile]
         public void OnStartRunning(ref SystemState state) {
             root = SystemAPI.GetSingletonEntity<Tags.Root>();
-            player = SystemAPI.GetSingletonEntity<Tags.Player>();
+            //player = SystemAPI.GetSingletonEntity<Tags.Player>();
         }
 
         [BurstCompile]
@@ -33,9 +33,9 @@ namespace Metal.Systems {
             new PlayerJob {
                 movementInput = SystemAPI.GetComponentRO<Components.Input>(root).ValueRO.movement
             }.ScheduleParallel();
-            new PathedJob {
-                playerPos = SystemAPI.GetComponentRO<LocalTransform>(player).ValueRO.Position,
-            }.ScheduleParallel();
+            // new PathedJob {
+            //     playerPos = SystemAPI.GetComponentRO<LocalTransform>(player).ValueRO.Position,
+            // }.ScheduleParallel();
         }
 
         [BurstCompile]
@@ -48,7 +48,10 @@ namespace Metal.Systems {
     internal partial struct PlayerJob : IJobEntity { 
         [ReadOnly] public float3 movementInput;
         [BurstCompile]
-        private void Execute(RefRW<Components.Movement> movement, in Tags.Controller.Player filter1) {
+        private void Execute(
+            RefRW<Components.Movement> movement,
+            in Tags.Controller.Player filter1) {
+            
             movement.ValueRW.input = movementInput;
         }
     }
@@ -57,7 +60,11 @@ namespace Metal.Systems {
     internal partial struct PathedJob : IJobEntity {
         [ReadOnly] public float3 playerPos;
         [BurstCompile]
-        private void Execute(RefRO<LocalTransform> transform, RefRW<Components.Movement> movement, in Tags.Controller.Pathed filter1) {
+        private void Execute(
+            RefRO<LocalTransform> transform,
+            RefRW<Components.Movement> movement,
+            in Tags.Controller.Pathed filter1) {
+            
             movement.ValueRW.input = math.normalize(-(transform.ValueRO.Position - playerPos));
         }
     }
