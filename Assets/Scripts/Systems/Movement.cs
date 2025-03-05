@@ -20,40 +20,31 @@ namespace Metal.Systems {
             ground = 1 << 0,
             vehicle = 1 << 1
         }
-
-        private Entity root;
-        private EntityQuery vehicleQuery;
-        private CollisionWorld collisionWorld;
         private ComponentLookup<LocalTransform> transformLookup;
         private BufferLookup<Authoring.WheelEntity> wheelEntitiesLookup;
         private const float fixedDeltaTime = 1.0f / 60.0f;
         
         [BurstCompile]
         public void OnCreate(ref SystemState state) {
-            //state.RequireForUpdate<Components.Tick>();
             state.RequireForUpdate<PhysicsWorldSingleton>();
             state.RequireForUpdate<Components.Input>();
-            state.RequireForUpdate<Tags.Root>();
             transformLookup = state.GetComponentLookup<LocalTransform>();
             wheelEntitiesLookup = state.GetBufferLookup<Authoring.WheelEntity>();
         }
 
         [BurstCompile]
         public void OnStartRunning(ref SystemState state) {
-            root = SystemAPI.GetSingletonEntity<Tags.Root>();
+            
         }
 
         [BurstCompile]
         public void OnUpdate(ref SystemState state) {
             transformLookup.Update(ref state);
             wheelEntitiesLookup.Update(ref state);
-            
             new VehicleJob {
                 physicsWorld = SystemAPI.GetSingleton<PhysicsWorldSingleton>().PhysicsWorld,
                 transformLookup = transformLookup,
                 wheelEntitiesLookup = wheelEntitiesLookup,
-                //inputDirection = SystemAPI.GetSingleton<Components.Input>().movement,
-                //deltaTime = SystemAPI.Time.DeltaTime,
                 fixedDeltaTime = fixedDeltaTime,
                 wheelCollisionFilter = new CollisionFilter {
                     BelongsTo = CollisionFilter.Default.BelongsTo, 
@@ -81,16 +72,14 @@ namespace Metal.Systems {
         [ReadOnly] public PhysicsWorld physicsWorld;
         [ReadOnly] public ComponentLookup<LocalTransform> transformLookup;
         [ReadOnly] public BufferLookup<Authoring.WheelEntity> wheelEntitiesLookup;
-        //[ReadOnly] public float3 inputDirection;
-        //[ReadOnly] public float deltaTime;
         [ReadOnly] public float fixedDeltaTime;
         [ReadOnly] public CollisionFilter wheelCollisionFilter;
-        //[ReadOnly] public uint fixedFrameCount;
         
         [BurstCompile]
         public void Execute(
             Entity vehicleEntity,
             RefRO<Components.Vehicle> vehicle,
+            RefRO<LocalTransform> vehicleTransform,
             RefRO<PhysicsMass> vehicleMass, 
             RefRW<PhysicsVelocity> vehicleVelocity,
             RefRO<Components.Movement> movement) {
@@ -99,7 +88,7 @@ namespace Metal.Systems {
             float3 angularVelocityAccumulated = float3.zero;
             float3 inputDirection = movement.ValueRO.input;
             // assumed vehicle is a uniformly scaled orphan object, so TransformHelpers.ComputeWorldTransformMatrix is not needed
-            float4x4 vehicleTransformMatrix = transformLookup[vehicleEntity].ToMatrix();
+            float4x4 vehicleTransformMatrix = vehicleTransform.ValueRO.ToMatrix();
             float3 vehicleWorldCenterOfMass = vehicleTransformMatrix.TransformPoint(vehicleMass.ValueRO.CenterOfMass);
             float3 vehicleWorldUp = vehicleTransformMatrix.Up();
             float3 wheelWorldUp = vehicleWorldUp;
@@ -122,9 +111,9 @@ namespace Metal.Systems {
                 groundedWheels++;
 
                 // Suspension
-                
+
                 if (!vehicle.ValueRO.enableSuspension) { continue; }
-                
+
                 Extensions.GetPointVelocity(
                     vehicleVelocity.ValueRO.Linear,
                     vehicleVelocity.ValueRO.Angular,
@@ -148,7 +137,7 @@ namespace Metal.Systems {
                     vehicleMass.ValueRO.InverseInertia,
                     vehicleWorldCenterOfMass);
             }
-            
+
             float3 carLocalVelocity = vehicleTransformMatrix.InverseTransformDirection(vehicleVelocity.ValueRO.Linear);
             float carVelocityRatio = math.length(carLocalVelocity) / vehicle.ValueRO.maxSpeed;
             
