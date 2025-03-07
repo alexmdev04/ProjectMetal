@@ -4,6 +4,7 @@ using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Physics;
 using Unity.Physics.Extensions;
+using Unity.Physics.Systems;
 using Unity.Transforms;
 using RaycastHit = Unity.Physics.RaycastHit;
 namespace Metal.Systems {
@@ -12,6 +13,7 @@ namespace Metal.Systems {
     /// </summary>
     [BurstCompile]
     [UpdateInGroup(typeof(FixedStepSimulationSystemGroup))]
+    [UpdateBefore(typeof(PhysicsSystemGroup))]
     public partial struct Movement : ISystem, ISystemStartStop {
         public enum CollisionLayer {
             all = ~0,

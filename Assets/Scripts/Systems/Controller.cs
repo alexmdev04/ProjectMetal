@@ -9,8 +9,8 @@ namespace Metal.Systems {
     /// Sets movement component values, will only control entities with a controlled tag (e.g. Tags.Controller.Pathed)
     /// </summary>
     [BurstCompile]
-    [UpdateInGroup(typeof(InitializationSystemGroup))]
-    [UpdateAfter(typeof(Input))]
+    [UpdateInGroup(typeof(FixedStepSimulationSystemGroup))]
+    [UpdateBefore(typeof(Movement))]
     public partial struct Controller : ISystem, ISystemStartStop {
         private Entity
             root,
@@ -19,13 +19,13 @@ namespace Metal.Systems {
         [BurstCompile]
         public void OnCreate(ref SystemState state) {
             state.RequireForUpdate<Tags.Root>();
-            //state.RequireForUpdate<Tags.Player>();
+            state.RequireForUpdate<Tags.Player>();
         }
 
         [BurstCompile]
         public void OnStartRunning(ref SystemState state) {
-            root = SystemAPI.GetSingletonEntity<Tags.Root>();
-            //player = SystemAPI.GetSingletonEntity<Tags.Player>();
+            SystemAPI.TryGetSingletonEntity<Tags.Root>(out root);
+            SystemAPI.TryGetSingletonEntity<Tags.Player>(out player);
         }
 
         [BurstCompile]
@@ -33,9 +33,9 @@ namespace Metal.Systems {
             new PlayerJob {
                 movementInput = SystemAPI.GetComponentRO<Components.Input>(root).ValueRO.movement
             }.ScheduleParallel();
-            // new PathedJob {
-            //     playerPos = SystemAPI.GetComponentRO<LocalTransform>(player).ValueRO.Position,
-            // }.ScheduleParallel();
+            new PathedJob {
+                playerPos = SystemAPI.GetComponentRO<LocalTransform>(player).ValueRO.Position,
+            }.ScheduleParallel();
         }
 
         [BurstCompile]
