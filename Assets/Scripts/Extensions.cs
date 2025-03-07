@@ -264,5 +264,11 @@ namespace Metal {
             remainder = a % b;
             return a / b;
         }
+
+        [BurstCompile]
+        public static void ToString(in SpawnPrefabRequestType type, out FixedString32Bytes name) => name = type switch {
+            SpawnPrefabRequestType.Vehicle_Hilux => (FixedString32Bytes)"Vehicle_Hilux",
+            _ => (FixedString32Bytes)"Unknown SpawnPrefabRequestType"
+        };
     }
 }
