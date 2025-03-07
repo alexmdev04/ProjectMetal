@@ -28,8 +28,6 @@ namespace Metal {
                 interact,
                 stats,
                 pause;
-
-            public Entity debugVehiclePrefab;
         }
     }
 }
