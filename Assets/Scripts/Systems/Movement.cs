@@ -1,11 +1,9 @@
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
-using Unity.Logging;
 using Unity.Mathematics;
 using Unity.Physics;
 using Unity.Physics.Extensions;
-using Unity.Scenes;
 using Unity.Transforms;
 using RaycastHit = Unity.Physics.RaycastHit;
 namespace Metal.Systems {
@@ -27,7 +25,6 @@ namespace Metal.Systems {
         [BurstCompile]
         public void OnCreate(ref SystemState state) {
             state.RequireForUpdate<PhysicsWorldSingleton>();
-            state.RequireForUpdate<Components.Input>();
             transformLookup = state.GetComponentLookup<LocalTransform>();
             wheelEntitiesLookup = state.GetBufferLookup<Authoring.WheelEntity>();
         }
