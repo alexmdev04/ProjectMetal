@@ -1,6 +1,7 @@
 using System.Linq;
 using Unity.Collections;
 using Unity.Entities;
+using Unity.Mathematics;
 using UnityEngine;
 
 namespace Metal.Authoring {
@@ -54,6 +55,12 @@ namespace Metal.Authoring {
             for (int i = 0; i < turningCurvePointCount - 1; i++) {
                 arrayBuilder[i] = points[i];
             }
+
+            // var wheelPositionList = authoring.wheelTransforms
+            //     .Select(static element => (float3)element.position)
+            //     .ToList();
+
+            //var wheelPositions = wheelPositionList.ToNativeArray(Allocator.Persistent);
             
             AddComponent(vehicle, new Components.Vehicle {
                 restLength = authoring.restLength,
@@ -73,7 +80,10 @@ namespace Metal.Authoring {
                 enableSteering = true,
                 enableDrag = true,
                 enableSuspension = true,
+                //wheelPositions = wheelPositions
             });
+
+            //wheelPositions.Dispose();
             
             blobBuilder.Dispose();
             
@@ -81,6 +91,7 @@ namespace Metal.Authoring {
             wheelEntities.EnsureCapacity(authoring.wheelTransforms.Length);
             
             foreach (Transform wheelTransform in authoring.wheelTransforms) {
+                
                 //Entity wheelEntity = ;
                 //AddComponent<Components.Wheel>(wheelEntity);
                 wheelEntities.Add(new WheelEntity { value = GetEntity(wheelTransform, TransformUsageFlags.Dynamic) });

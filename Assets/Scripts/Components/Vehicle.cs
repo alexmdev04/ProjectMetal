@@ -1,3 +1,4 @@
+using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 
@@ -25,7 +26,8 @@ namespace Metal.Components {
         public BlobAssetReference<FloatArrayBlob> turningCurve;
         
         public float3 accelerationPointOffset;
-        //private AnimationCurve turningCurve;
+        
+        //public NativeArray<float3> wheelPositions;
     }
 }
 
