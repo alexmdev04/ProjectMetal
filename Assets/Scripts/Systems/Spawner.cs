@@ -153,17 +153,6 @@ namespace Metal {
             this.isEnemy = isEnemy;
             this.isPlayer = isPlayer;
         }
-
-        public static SpawnPrefabRequest PlayerPreset = new SpawnPrefabRequest() {
-            type = SpawnPrefabRequestType.Vehicle_Hilux,
-            spawnTransform = new LocalTransform() {
-                Position = math.up() * 5.0f,
-                Rotation = quaternion.identity,
-                Scale = 1.0f
-            },
-            isPlayer = true,
-            isEnemy = false,
-        };
         
         // this constructor represents most spawn requests
         public SpawnPrefabRequest(SpawnPrefabRequestType type) {

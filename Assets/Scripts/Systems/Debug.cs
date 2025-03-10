@@ -24,7 +24,16 @@ namespace Metal.Systems {
         public void OnStartRunning(ref SystemState state) {
             Log.Debug("debug started");
             root = SystemAPI.GetSingletonEntity<Tags.Root>();
-            SystemAPI.GetComponent<Components.SpawnerQueue>(root).Request(SpawnPrefabRequest.PlayerPreset);
+            SystemAPI.GetComponent<Components.SpawnerQueue>(root).Request(new SpawnPrefabRequest() {
+                type = SpawnPrefabRequestType.Vehicle_Hilux,
+                spawnTransform = new LocalTransform() {
+                    Position = math.up() * 5.0f,
+                    Rotation = quaternion.identity,
+                    Scale = 1.0f
+                },
+                isPlayer = true,
+                isEnemy = false,
+            });
         }
 
         public void OnUpdate(ref SystemState state) {
