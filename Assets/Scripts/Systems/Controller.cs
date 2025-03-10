@@ -3,6 +3,7 @@ using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Transforms;
+using UnityEngine;
 
 namespace Metal.Systems {
     /// <summary>
@@ -64,8 +65,12 @@ namespace Metal.Systems {
             RefRO<LocalTransform> transform,
             RefRW<Components.Movement> movement,
             in Tags.Controller.Pathed filter1) {
-            
-            movement.ValueRW.input = math.normalize(-(transform.ValueRO.Position - playerPos));
+
+            float3 localDirToPlayer = transform.ValueRO.ToMatrix().InverseTransformDirection( // localise
+                math.normalize(playerPos - transform.ValueRO.Position) // world direction to player
+            );
+            movement.ValueRW.input = new float3(localDirToPlayer.z < 0.0f ? math.sign(localDirToPlayer.x) : localDirToPlayer.x, 0, 1.0f);
+            //UnityEngine.Debug.DrawRay(transform.ValueRO.Position, movement.ValueRW.input, Color.green);
         }
     }
 }
