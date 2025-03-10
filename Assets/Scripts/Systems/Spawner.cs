@@ -116,9 +116,12 @@ namespace Metal {
                     );
 
                     ecb.SetComponent(index, newEntity, request.spawnTransform);
-                    
-                    LogSpawnRequest(request);
+
+                    if (spawnerData.spawnerLogging) {
+                        LogSpawnRequest(request);
+                    }
                 }
+                
             }
 
             [BurstCompile]

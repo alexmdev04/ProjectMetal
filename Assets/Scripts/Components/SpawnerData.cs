@@ -4,6 +4,7 @@ namespace Metal {
     namespace Components {
         public struct SpawnerData : IComponentData {
             public float playerEnemySpawnRadius;
+            public bool spawnerLogging;
             public Entity vehicleHilux;
             
             public readonly Entity GetEntityPrefab(SpawnPrefabRequestType spawnRequestType) => spawnRequestType switch {

@@ -9,6 +9,7 @@ namespace Metal.Authoring {
         [Header("Spawner Config")]
         public GameObject vehicleHilux;
         public float playerEnemySpawnRadius = 25.0f;
+        public bool spawnerLogging;
     }
     
     public class RootBaker : Baker<Root> {
@@ -20,7 +21,8 @@ namespace Metal.Authoring {
             // assign prefabs
             AddComponent(root, new Components.SpawnerData {
                 vehicleHilux = GetEntity(authoring.vehicleHilux, TransformUsageFlags.Dynamic),
-                playerEnemySpawnRadius = authoring.playerEnemySpawnRadius
+                playerEnemySpawnRadius = authoring.playerEnemySpawnRadius,
+                spawnerLogging = authoring.spawnerLogging
             });
 
             #if UNITY_EDITOR
