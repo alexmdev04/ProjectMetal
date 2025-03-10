@@ -41,8 +41,8 @@ namespace Metal {
                 var ecb = SystemAPI.GetSingleton<BeginSimulationEntityCommandBufferSystem.Singleton>()
                     .CreateCommandBuffer(state.WorldUnmanaged).AsParallelWriter();
 
-                Components.SpawnerData spawner = SystemAPI.GetComponent<Components.SpawnerData>(root);
-                NativeQueue<SpawnPrefabRequest> spawnerQueue = SystemAPI.GetComponent<Components.SpawnerQueue>(root).q; 
+                Components.SpawnerData spawnerData = SystemAPI.GetComponent<Components.SpawnerData>(root);
+                NativeQueue<SpawnPrefabRequest> spawnerQueue = SystemAPI.GetComponentRO<Components.SpawnerQueue>(root).ValueRO.q; 
                 NativeArray<SpawnPrefabRequest> spawnerArray = spawnerQueue.ToArray(Allocator.TempJob);
                 spawnerQueue.Clear();
 
@@ -53,7 +53,7 @@ namespace Metal {
                 }
                 
                 new SpawnerJob() {
-                    spawner = spawner,
+                    spawnerData = spawnerData,
                     spawnerArray = spawnerArray,
                     random = new Random(random.NextUInt()),
                     ecb = ecb,
@@ -78,9 +78,9 @@ namespace Metal {
         }
         
         [BurstCompile]
-        public partial struct SpawnerJob : IJobParallelFor {
+        public struct SpawnerJob : IJobParallelFor {
             public EntityCommandBuffer.ParallelWriter ecb;
-            public Components.SpawnerData spawner;
+            public Components.SpawnerData spawnerData;
             public NativeArray<SpawnPrefabRequest> spawnerArray;
             public bool playerFound;
             public float3 playerPosition;
@@ -89,8 +89,8 @@ namespace Metal {
             [BurstCompile]
             public void Execute(int index) {
                 SpawnPrefabRequest request = spawnerArray[index];
-                Entity newEntity = ecb.Instantiate(index, spawner.GetEntityPrefab(request.type));
-
+                Entity newEntity = ecb.Instantiate(index, spawnerData.GetEntityPrefab(request.type));
+                
                 if (request.spawnTransform.Scale <= float.Epsilon) {
                     Log.Warning(
                         "[Systems.Spawner] A spawn request was made with a transform scale <= 0, this is probably bad.");
@@ -107,7 +107,7 @@ namespace Metal {
                 if (request.isEnemy && playerFound) {
                     request.spawnTransform.Position = math.mul(
                         quaternion.Euler(0.0f, random.NextFloat(0.0f, 360.0f), 0.0f),
-                        (math.forward() * spawner.playerEnemySpawnRadius) + (math.up() * 3.0f)
+                        (math.forward() * spawnerData.playerEnemySpawnRadius) + (math.up() * 3.0f)
                     );
 
                     request.spawnTransform.Rotation = quaternion.LookRotation(
@@ -139,9 +139,9 @@ namespace Metal {
     [BurstCompile]
     public struct SpawnPrefabRequest {
         public SpawnPrefabRequestType type;
-        public LocalTransform spawnTransform;
         public bool isEnemy;
         public bool isPlayer;
+        public LocalTransform spawnTransform;
         
         public SpawnPrefabRequest(
             SpawnPrefabRequestType type,
