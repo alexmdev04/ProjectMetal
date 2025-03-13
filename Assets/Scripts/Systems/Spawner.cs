@@ -89,39 +89,41 @@ namespace Metal {
             [BurstCompile]
             public void Execute(int index) {
                 SpawnPrefabRequest request = spawnerArray[index];
-                Entity newEntity = ecb.Instantiate(index, spawnerData.GetEntityPrefab(request.type));
-                
-                if (request.spawnTransform.Scale <= float.Epsilon) {
-                    Log.Warning(
-                        "[Systems.Spawner] A spawn request was made with a transform scale <= 0, this is probably bad.");
-                }
+                for (int i = 0; i < request.quantity; i++) {
+                    
+                    Entity newEntity = ecb.Instantiate(index, spawnerData.GetEntityPrefab(request.type));
 
-                if (request.isPlayer) {
-                    ecb.AddComponent<Tags.Player>(index, newEntity);
-                }
+                    if (request.spawnTransform.Scale <= float.Epsilon) {
+                        Log.Warning(
+                            "[Systems.Spawner] A spawn request was made with a transform scale <= 0, this is probably bad.");
+                    }
 
-                if (request.isEnemy) {
-                    ecb.AddComponent<Tags.Controller.Pathed>(index, newEntity);
-                }
+                    if (request.isPlayer) {
+                        ecb.AddComponent<Tags.Player>(index, newEntity);
+                    }
 
-                if (request.isEnemy && playerFound) {
-                    request.spawnTransform.Position = math.mul(
-                        quaternion.Euler(0.0f, random.NextFloat(0.0f, 360.0f), 0.0f),
-                        (math.forward() * spawnerData.playerEnemySpawnRadius) + (math.up() * 3.0f)
-                    );
+                    if (request.isEnemy) {
+                        ecb.AddComponent<Tags.Controller.Pathed>(index, newEntity);
+                    }
 
-                    request.spawnTransform.Rotation = quaternion.LookRotation(
-                        -math.normalize(request.spawnTransform.Position - playerPosition),
-                        math.up()
-                    );
+                    if (request.isEnemy && playerFound) {
+                        request.spawnTransform.Position = math.mul(
+                            quaternion.Euler(0.0f, random.NextFloat(0.0f, 360.0f), 0.0f),
+                            (math.forward() * spawnerData.playerEnemySpawnRadius) + (math.up() * 3.0f)
+                        );
 
-                    ecb.SetComponent(index, newEntity, request.spawnTransform);
+                        request.spawnTransform.Rotation = quaternion.LookRotation(
+                            -math.normalize(request.spawnTransform.Position - playerPosition),
+                            math.up()
+                        );
 
+                        ecb.SetComponent(index, newEntity, request.spawnTransform);
+                    }
+                    
                     if (spawnerData.spawnerLogging) {
                         LogSpawnRequest(request);
                     }
                 }
-                
             }
 
             [BurstCompile]
@@ -142,27 +144,31 @@ namespace Metal {
     [BurstCompile]
     public struct SpawnPrefabRequest {
         public SpawnPrefabRequestType type;
+        public uint quantity;
         public bool isEnemy;
         public bool isPlayer;
         public LocalTransform spawnTransform;
         
         public SpawnPrefabRequest(
             SpawnPrefabRequestType type,
-            LocalTransform spawnTransform,
             bool isEnemy,
+            LocalTransform spawnTransform,
+            uint quantity = 1,
             bool isPlayer = false) {
             this.type = type;
             this.spawnTransform = spawnTransform;
+            this.quantity = quantity;
             this.isEnemy = isEnemy;
             this.isPlayer = isPlayer;
         }
         
         // this constructor represents most spawn requests
-        public SpawnPrefabRequest(SpawnPrefabRequestType type) {
+        public SpawnPrefabRequest(SpawnPrefabRequestType type, uint quantity = 1) {
             this.type = type;
-            spawnTransform = LocalTransform.Identity;
-            isPlayer = false;
-            isEnemy = true;
+            this.quantity = quantity;
+            this.spawnTransform = LocalTransform.Identity;
+            this.isPlayer = false;
+            this.isEnemy = true;
         }
     }
 }

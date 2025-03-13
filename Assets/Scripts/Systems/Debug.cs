@@ -31,8 +31,9 @@ namespace Metal.Systems {
                     Rotation = quaternion.identity,
                     Scale = 1.0f
                 },
+                quantity = 1,
                 isPlayer = true,
-                isEnemy = false,
+                isEnemy = false
             });
         }
 
@@ -43,7 +44,7 @@ namespace Metal.Systems {
             
             if (UnityEngine.InputSystem.Keyboard.current.f7Key.isPressed || UnityEngine.InputSystem.Keyboard.current.f6Key.wasPressedThisFrame) {
                 SystemAPI.GetComponent<Components.SpawnerQueue>(root)
-                    .Request(new SpawnPrefabRequest(SpawnPrefabRequestType.Vehicle_Hilux));
+                    .Request(new SpawnPrefabRequest(SpawnPrefabRequestType.Vehicle_Hilux, 10));
             }
         }
 
