@@ -36,11 +36,46 @@ namespace Metal {
                 );
             }
 
+            // public void UpdateQueue<TRequest, TComponentData, TComponentQueue, TJob>(
+            //     in WorldUnmanaged worldUnmanaged,
+            //     //out EntityCommandBuffer.ParallelWriter ecb,
+            //     out NativeArray<TRequest> array,
+            //     //out TComponentData data,
+            //     out TJob job)
+            //     where TRequest : unmanaged 
+            //     where TComponentData : unmanaged, IComponentData
+            //     where TComponentQueue : unmanaged, IComponentData, Extensions.IQueue<TRequest>
+            //     where TJob : IJobParallelFor, IQueueJob<TComponentData, TRequest>, new() {
+            //     
+            //     EntityCommandBuffer.ParallelWriter ecb = SystemAPI.GetSingleton<BeginSimulationEntityCommandBufferSystem.Singleton>()
+            //         .CreateCommandBuffer(worldUnmanaged).AsParallelWriter();
+            //
+            //     TComponentData data = SystemAPI.GetComponent<TComponentData>(root);
+            //     
+            //     SystemAPI.GetComponentRO<TComponentQueue>(root).ValueRO.GetQueue(out NativeQueue<TRequest> queue); 
+            //     array = queue.ToArray(Allocator.TempJob);
+            //     queue.Clear();
+            //
+            //     job = new TJob() {
+            //         ecb = ecb,
+            //         data = data,
+            //         array = array
+            //     };
+            // }
+            
             [BurstCompile]
             public void OnUpdate(ref SystemState state) {
+                // UpdateQueue<SpawnPrefabRequest, Components.SpawnerData, Components.SpawnerQueue, SpawnerJob>(
+                //     state.WorldUnmanaged,
+                //     //out var ecb,
+                //     out var spawnerArray,
+                //     //out var spawnerData,
+                //     out var spawnerJob
+                // );
+                
                 var ecb = SystemAPI.GetSingleton<BeginSimulationEntityCommandBufferSystem.Singleton>()
                     .CreateCommandBuffer(state.WorldUnmanaged).AsParallelWriter();
-
+                
                 Components.SpawnerData spawnerData = SystemAPI.GetComponent<Components.SpawnerData>(root);
                 NativeQueue<SpawnPrefabRequest> spawnerQueue = SystemAPI.GetComponentRO<Components.SpawnerQueue>(root).ValueRO.q; 
                 NativeArray<SpawnPrefabRequest> spawnerArray = spawnerQueue.ToArray(Allocator.TempJob);
@@ -51,10 +86,15 @@ namespace Metal {
                 if (playerFound) {
                     playerPosition = SystemAPI.GetComponentRO<LocalTransform>(player).ValueRO.ToMatrix().c3.xyz;
                 }
+
+                // spawnerJob.random = new Random(random.NextUInt());
+                // spawnerJob.playerFound = playerFound;
+                // spawnerJob.playerPosition = playerPosition;
+                // spawnerJob.Schedule(spawnerArray.Length, 32).Complete();
                 
                 new SpawnerJob() {
-                    spawnerData = spawnerData,
-                    spawnerArray = spawnerArray,
+                    data = spawnerData,
+                    array = spawnerArray,
                     random = new Random(random.NextUInt()),
                     ecb = ecb,
                     playerFound = playerFound,
@@ -76,20 +116,31 @@ namespace Metal {
                 
             }
         }
+
+        // public interface IQueueJob<TComponentData, TRequest> 
+        //     where TComponentData : unmanaged, IComponentData 
+        //     where TRequest : struct {
+        //     public EntityCommandBuffer.ParallelWriter ecb { get; set; }
+        //     public TComponentData data { get; set; }
+        //     public NativeArray<TRequest> array { get; set;  }
+        // }
         
         [BurstCompile]
-        public struct SpawnerJob : IJobParallelFor {
+        public struct SpawnerJob : IJobParallelFor {//, IQueueJob<Components.SpawnerData, SpawnPrefabRequest> {
             public EntityCommandBuffer.ParallelWriter ecb;
-            public Components.SpawnerData spawnerData;
-            public NativeArray<SpawnPrefabRequest> spawnerArray;
+            // public EntityCommandBuffer.ParallelWriter ecb { get; set; }
+            // public Components.SpawnerData data { get; set; }
+            // public NativeArray<SpawnPrefabRequest> array { get; set; }
+            public Components.SpawnerData data;
+            public NativeArray<SpawnPrefabRequest> array;
             public bool playerFound;
             public float3 playerPosition;
             public Random random;
 
             [BurstCompile]
             public void Execute(int index) {
-                SpawnPrefabRequest request = spawnerArray[index];
-                Entity newEntity = ecb.Instantiate(index, spawnerData.GetEntityPrefab(request.type));
+                SpawnPrefabRequest request = array[index];
+                Entity newEntity = ecb.Instantiate(index, data.GetEntityPrefab(request.type));
                 
                 if (request.spawnTransform.Scale <= float.Epsilon) {
                     Log.Warning(
@@ -107,7 +158,7 @@ namespace Metal {
                 if (request.isEnemy && playerFound) {
                     request.spawnTransform.Position = math.mul(
                         quaternion.Euler(0.0f, random.NextFloat(0.0f, 360.0f), 0.0f),
-                        (math.forward() * spawnerData.playerEnemySpawnRadius) + (math.up() * 3.0f)
+                        (math.forward() * data.playerEnemySpawnRadius) + (math.up() * 3.0f)
                     );
 
                     request.spawnTransform.Rotation = quaternion.LookRotation(
@@ -117,7 +168,7 @@ namespace Metal {
 
                     ecb.SetComponent(index, newEntity, request.spawnTransform);
 
-                    if (spawnerData.spawnerLogging) {
+                    if (data.spawnerLogging) {
                         LogSpawnRequest(request);
                     }
                 }

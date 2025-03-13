@@ -8,6 +8,7 @@ using Unity.Transforms;
 using Unity.Collections;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.Scripting;
 using ForceMode = Unity.Physics.Extensions.ForceMode;
 
 namespace Metal {
@@ -270,5 +271,10 @@ namespace Metal {
             SpawnPrefabRequestType.Vehicle_Hilux => (FixedString32Bytes)"Vehicle_Hilux",
             _ => (FixedString32Bytes)"Unknown SpawnPrefabRequestType"
         };
+        
+        [RequireImplementors]
+        public interface IQueue<T> where T : unmanaged {
+            public void GetQueue(out NativeQueue<T> queue);
+        }
     }
 }

@@ -1,10 +1,11 @@
+using System;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
 
 namespace Metal.Components {
     [BurstCompile]
-    public partial struct SpawnerQueue : IComponentData {
+    public partial struct SpawnerQueue : IComponentData {//, Extensions.IQueue<SpawnPrefabRequest> {
         public NativeQueue<SpawnPrefabRequest> q;
 
         [BurstCompile]
@@ -18,5 +19,10 @@ namespace Metal.Components {
         }
         
         public readonly int length => q.Count;
+        
+        // [BurstCompile]
+        // public void GetQueue(out NativeQueue<SpawnPrefabRequest> queue) {
+        //     queue = q;
+        // }
     }
 }
