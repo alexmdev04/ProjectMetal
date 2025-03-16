@@ -11,6 +11,7 @@ namespace Metal {
         movementSpeed
     }
     
+    #region Stat Value Functions
     [BurstCompile]
     public static class StatValue {
         [BurstCompile]
@@ -75,8 +76,10 @@ namespace Metal {
             Set(ref statValue, valGet + value);
         }
     }
-
+    #endregion
+    
     namespace Components {
+        #region Stat Value Interface
         [UnityEngine.Scripting.RequireImplementors]
         public interface IStatValue {
             public StatValueType statValueType { get; set; } // readonly
@@ -90,8 +93,10 @@ namespace Metal {
             public bool clamped { get; set; }
             public bool locked { get; set; }
         }
+        #endregion
         
         namespace StatValues {
+            #region Health
             [BurstCompile]
             public struct Health : IComponentData, IStatValue {
                 public StatValueType statValueType { get; set; }
@@ -102,7 +107,9 @@ namespace Metal {
                 public bool clamped { get; set; }
                 public bool locked { get; set; }
             }
-            
+            #endregion
+
+            #region CooldownRate
             [BurstCompile]
             public struct CooldownRate : IComponentData, IStatValue {
                 public StatValueType statValueType { get; set; }
@@ -112,8 +119,10 @@ namespace Metal {
                 public double valueMin { get; set; }
                 public bool clamped { get; set; }
                 public bool locked { get; set; }
-            }
+            } 
+            #endregion
 
+            #region FireRate
             [BurstCompile]
             public struct FireRate : IComponentData, IStatValue {
                 public StatValueType statValueType { get; set; }
@@ -124,7 +133,9 @@ namespace Metal {
                 public bool clamped { get; set; }
                 public bool locked { get; set; }
             }
+            #endregion
 
+            #region MovementSpeed
             [BurstCompile]
             public struct MovementSpeed : IComponentData, IStatValue {
                 public StatValueType statValueType { get; set; }
@@ -135,6 +146,7 @@ namespace Metal {
                 public bool clamped { get; set; }
                 public bool locked { get; set; }
             }
+            #endregion
         }
     }
 }
