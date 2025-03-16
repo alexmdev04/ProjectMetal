@@ -1,5 +1,7 @@
+using System;
 using Unity.Burst;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Jobs;
 using Unity.Logging;
@@ -81,6 +83,7 @@ namespace Metal {
         public struct SpawnerJob : IJobParallelFor {
             public EntityCommandBuffer.ParallelWriter ecb;
             public Components.SpawnerData spawnerData;
+            [NativeDisableContainerSafetyRestriction]
             public NativeArray<SpawnPrefabRequest> spawnerArray;
             public bool playerFound;
             public float3 playerPosition;
@@ -119,6 +122,43 @@ namespace Metal {
 
                         ecb.SetComponent(index, newEntity, request.spawnTransform);
                     }
+
+                    if (request.statValueConstructors.IsCreated) {
+                        foreach (ConstructStatValue statValueConstructor in request.statValueConstructors) {
+                            switch (statValueConstructor.statValueType) {
+                                case StatValueType.none: {
+                                    throw new NotImplementedException();
+                                }
+                                case StatValueType.health: {
+                                    StatValue.Construct(statValueConstructor, 
+                                        out Components.StatValues.Health newStatValue);
+                                    ecb.AddComponent(index, newEntity, newStatValue);
+                                    break;
+                                }
+                                case StatValueType.cooldownRate: {
+                                    StatValue.Construct(statValueConstructor, 
+                                        out Components.StatValues.CooldownRate newStatValue);
+                                    ecb.AddComponent(index, newEntity, newStatValue);
+                                    break;
+                                }
+                                case StatValueType.fireRate: {
+                                    StatValue.Construct(statValueConstructor, 
+                                        out Components.StatValues.FireRate newStatValue);
+                                    ecb.AddComponent(index, newEntity, newStatValue);
+                                    break;
+                                }
+                                case StatValueType.movementSpeed: {
+                                    StatValue.Construct(statValueConstructor, 
+                                        out Components.StatValues.MovementSpeed newStatValue);
+                                    ecb.AddComponent(index, newEntity, newStatValue);
+                                    break;
+                                }
+                                default: {
+                                    throw new NotImplementedException();
+                                }
+                            }
+                        }
+                    }
                     
                     if (spawnerData.spawnerLogging) {
                         LogSpawnRequest(request);
@@ -147,12 +187,15 @@ namespace Metal {
         public uint quantity;
         public bool isEnemy;
         public bool isPlayer;
+        [NativeDisableContainerSafetyRestriction]
+        public NativeArray<ConstructStatValue> statValueConstructors;
         public LocalTransform spawnTransform;
         
         public SpawnPrefabRequest(
             SpawnPrefabRequestType type,
             bool isEnemy,
             LocalTransform spawnTransform,
+            NativeArray<ConstructStatValue>? statValueConstructors = null,
             uint quantity = 1,
             bool isPlayer = false) {
             this.type = type;
@@ -160,6 +203,7 @@ namespace Metal {
             this.quantity = quantity;
             this.isEnemy = isEnemy;
             this.isPlayer = isPlayer;
+            this.statValueConstructors = statValueConstructors.GetValueOrDefault();
         }
         
         // this constructor represents most spawn requests
@@ -169,6 +213,32 @@ namespace Metal {
             this.spawnTransform = LocalTransform.Identity;
             this.isPlayer = false;
             this.isEnemy = true;
+            this.statValueConstructors = new NativeArray<ConstructStatValue>(new ConstructStatValue[] {
+                new () {
+                    statValueType = StatValueType.health,
+                    value = 100.0d,
+                    clamped = true,
+                    locked = false,
+                    valueMax = double.MaxValue,
+                    valueMin = 0.0d,
+                },
+                new () {
+                    statValueType = StatValueType.movementSpeed,
+                    value = 100.0d,
+                    clamped = true,
+                    locked = false,
+                    valueMax = double.MaxValue,
+                    valueMin = 0.0d,
+                },
+                new () {
+                    statValueType = StatValueType.fireRate,
+                    value = 100.0d,
+                    clamped = true,
+                    locked = false,
+                    valueMax = double.MaxValue,
+                    valueMin = 0.0d,
+                },
+            }, Allocator.Persistent);
         }
     }
 }
