@@ -1,7 +1,9 @@
+using Unity.Burst;
 using Unity.Entities;
 
 namespace Metal {
     namespace Components {
+        [BurstCompile]
         public struct SpawnerData : IComponentData {
             public float playerEnemySpawnRadius;
             public bool spawnerLogging;
