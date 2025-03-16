@@ -33,7 +33,33 @@ namespace Metal.Systems {
                 },
                 quantity = 1,
                 isPlayer = true,
-                isEnemy = false
+                isEnemy = false,
+                statValueConstructors = new NativeArray<ConstructStatValue>(new ConstructStatValue[] {
+                    new () {
+                        statValueType = StatValueType.health,
+                        value = 100.0d,
+                        clamped = true,
+                        locked = false,
+                        valueMax = double.MaxValue,
+                        valueMin = 0.0d,
+                    },
+                    new () {
+                        statValueType = StatValueType.movementSpeed,
+                        value = 100.0d,
+                        clamped = true,
+                        locked = false,
+                        valueMax = double.MaxValue,
+                        valueMin = 0.0d,
+                    },
+                    new () {
+                        statValueType = StatValueType.fireRate,
+                        value = 100.0d,
+                        clamped = true,
+                        locked = false,
+                        valueMax = double.MaxValue,
+                        valueMin = 0.0d,
+                    },
+                }, Allocator.Persistent)
             });
         }
 
