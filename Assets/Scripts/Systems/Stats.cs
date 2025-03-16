@@ -45,21 +45,4 @@ namespace Metal {
         public bool clamped;
         public bool locked;
     }
-
-    public enum StatValueType {
-        none,
-        health,
-        cooldownRate,
-        fireRate,
-        movementSpeed
-    }
-
-    public enum StatType {
-        none,
-        damageDealt,
-        damageReceived,
-        movementSpeed,
-        fireRate,
-        cooldownRate
-    }
 }

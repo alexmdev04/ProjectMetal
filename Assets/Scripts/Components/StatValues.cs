@@ -2,8 +2,15 @@ using Unity.Burst;
 using Unity.Entities;
 using Unity.Mathematics;
 
-
 namespace Metal {
+    public enum StatValueType {
+        none,
+        health,
+        cooldownRate,
+        fireRate,
+        movementSpeed
+    }
+    
     [BurstCompile]
     public static class StatValue {
         [BurstCompile]
