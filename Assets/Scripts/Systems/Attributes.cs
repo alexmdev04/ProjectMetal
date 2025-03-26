@@ -18,8 +18,8 @@ namespace Metal {
         public double GetOverrideValue() => valueOverride;
 
         public enum Template {
-            NormalAttack,
-            Heal,
+            normalAttack,
+            heal,
         }
 
         // default constructor
@@ -58,12 +58,12 @@ namespace Metal {
             in Entity recipient,
             in bool isAddition = false) {
             switch (template) {
-                case Template.NormalAttack: {
+                case Template.normalAttack: {
                     this.outgoingAttribute = AttributeType.damage;
                     this.targetAttribute = AttributeType.health;
                     break;
                 }
-                case Template.Heal: {
+                case Template.heal: {
                     this.outgoingAttribute = AttributeType.damage;
                     this.targetAttribute = AttributeType.health;
                     break;
@@ -75,6 +75,21 @@ namespace Metal {
             this.valueOverride = 0.0d;
             this.isAddition = isAddition;
         }
+    }
+
+    public enum AttributeManagerRequestType { add, remove, edit }
+    
+    public struct AttributeManagerRequest {
+        public AttributeManagerRequestType requestType;
+        public AttributeType attType;
+        public Entity entity;
+    }
+    
+    public struct AttributeModManagerRequest {
+        public AttributeManagerRequestType requestType;
+        public AttributeModType modType;
+        public Entity entity;
+        public int modIndex;
     }
     
     namespace Systems {
@@ -124,13 +139,13 @@ namespace Metal {
                 NativeArray<AttributeRequest> attributeRequests = attributeQueue.ToArray(Allocator.TempJob);
                 attributeQueue.Clear();
                 
-                new AttributeQueueJob<TAtt, TModAtt>() {
+                var attributeQueueHandle = new AttributeQueueJob<TAtt, TModAtt>() {
                     //ecb = ecb,
                     attLookup = attLookup,
                     modAttLookup = modAttLookup,
                     attributeData = attributeData,
                     attributeRequests = attributeRequests
-                }.Run(attributeRequests.Length);
+                }.Schedule(attributeRequests.Length, state.Dependency);
                 attributeRequests.Dispose();
             }
 
@@ -179,10 +194,11 @@ namespace Metal {
         [UpdateInGroup(typeof(SimulationSystemGroup), OrderFirst = true)]
         [UpdateBefore(typeof(FixedStepSimulationSystemGroup))]
         [UpdateAfter(typeof(BeginSimulationEntityCommandBufferSystem))]
-        public partial struct AttributeUpdateSystem<TAtt, TModAtt> : ISystem
+        public partial struct AttributeUpdateSystem<TAtt, TModAtt> : ISystem, ISystemStartStop
             where TAtt : unmanaged, Components.IAttribute
             where TModAtt : unmanaged, Components.IAttributeModValue {
 
+            public Entity root;
             public ComponentLookup<TAtt> attLookup;
             public ComponentLookup<TModAtt> modAttLookup;
             public BufferLookup<Components.AttributeMod<TAtt, Components.AttributeModTypeAdd>> addModsLookup;
@@ -191,6 +207,8 @@ namespace Metal {
             public EntityQuery entitiesWithAttributes;
 
             public void OnCreate(ref SystemState state) {
+                state.RequireForUpdate<Tags.Root>();
+                state.RequireForUpdate<BeginSimulationEntityCommandBufferSystem.Singleton>();
                 attLookup = state.GetComponentLookup<TAtt>();
                 modAttLookup = state.GetComponentLookup<TModAtt>();
                 addModsLookup = state.GetBufferLookup<Components.AttributeMod<TAtt, Components.AttributeModTypeAdd>>();
@@ -205,14 +223,22 @@ namespace Metal {
                 });
             }
 
+            public void OnStartRunning(ref SystemState state) {
+                root = SystemAPI.GetSingletonEntity<Tags.Root>();
+            }
+            
             public void OnUpdate(ref SystemState state) {
                 attLookup.Update(ref state);
                 modAttLookup.Update(ref state);
                 addModsLookup.Update(ref state);
                 mulModsLookup.Update(ref state);
                 expModsLookup.Update(ref state);
+                
+                var ecb = SystemAPI.GetSingleton<BeginSimulationEntityCommandBufferSystem.Singleton>()
+                    .CreateCommandBuffer(state.WorldUnmanaged).AsParallelWriter();
+                
                 NativeArray<Entity> entArr = entitiesWithAttributes.ToEntityArray(Allocator.TempJob);
-                new AttributeUpdateJob<TAtt, TModAtt>() {
+                var attributeUpdateHandle = new AttributeUpdateJob<TAtt, TModAtt>() {
                     attLookup = attLookup,
                     modAttLookup = modAttLookup,
                     addModsLookup = addModsLookup,
@@ -220,8 +246,38 @@ namespace Metal {
                     expModsLookup = expModsLookup,
                     entArr = entArr,
                 }.Schedule(entArr.Length, 32);
-
                 entArr.Dispose();
+                
+                NativeQueue<AttributeManagerRequest> attributeManagerRequestsQueue = 
+                    SystemAPI.GetComponentRO<Components.AttributeManagerQueue>(root).ValueRO.q;
+                if (attributeManagerRequestsQueue.IsEmpty()) { return; }
+
+                NativeStream attributeManagerRequests = new NativeStream(attributeManagerRequestsQueue.Count, Allocator.TempJob);
+                attributeManagerRequests.AsWriter().Allocate<AttributeManagerRequest>();
+                
+                var attributeManagerHandle = new AttributeManagerRequestJob<TAtt, TModAtt>() {
+                    attLookup = attLookup,
+                    addModsLookup = addModsLookup,
+                    mulModsLookup = mulModsLookup,
+                    expModsLookup = expModsLookup,
+                }.Schedule(0, 32, attributeUpdateHandle);
+                
+                ///////////////////////////////////////////////////////////////////////////////////////
+                
+                NativeQueue<AttributeModManagerRequest> attributeModManagerRequests = 
+                    SystemAPI.GetComponentRO<Components.AttributeModManagerQueue>(root).ValueRO.q;
+                if (attributeModManagerRequests.IsEmpty()) { return; }
+                
+                var attributeModManagerHandle = new AttributeModManagerRequestJob<TAtt, TModAtt>() {
+                    attLookup = attLookup,
+                    addModsLookup = addModsLookup,
+                    mulModsLookup = mulModsLookup,
+                    expModsLookup = expModsLookup,
+                }.Schedule(0, 32, attributeUpdateHandle);
+            }
+
+            public void OnStopRunning(ref SystemState state) {
+                
             }
         }
 
@@ -272,6 +328,56 @@ namespace Metal {
                 //         att.ValueRW.SetBaseValue(baseValue);
                 //     }
                 // }
+            }
+        }
+
+        public struct AttributeManagerRequestJob<TAtt, TModAtt> : IJobParallelFor 
+            where TAtt : unmanaged, Components.IAttribute 
+            where TModAtt : unmanaged, Components.IAttributeModValue {
+            
+            [NativeDisableParallelForRestriction] [NativeDisableContainerSafetyRestriction]
+            public ComponentLookup<TAtt> attLookup;
+
+            [NativeDisableParallelForRestriction] [NativeDisableContainerSafetyRestriction]
+            public BufferLookup<Components.AttributeMod<TAtt, Components.AttributeModTypeAdd>> addModsLookup;
+            
+            [NativeDisableParallelForRestriction] [NativeDisableContainerSafetyRestriction]
+            public BufferLookup<Components.AttributeMod<TAtt, Components.AttributeModTypeMul>> mulModsLookup;
+            
+            [NativeDisableParallelForRestriction] [NativeDisableContainerSafetyRestriction]
+            public BufferLookup<Components.AttributeMod<TAtt, Components.AttributeModTypeExp>> expModsLookup;
+            
+            //public BufferLookup<Components.AttributeMod<TAtt, TModType>> modLookup;
+            public NativeStream requests;
+            public NativeQueue<AttributeManagerRequest>.ParallelWriter requestsQ;
+            
+            public void Execute(int index) {
+                //requests.AsReader().Read<AttributeModRequest<TAtt, TModType>>();
+            }
+        }
+        
+        public struct AttributeModManagerRequestJob<TAtt, TModAtt> : IJobParallelFor 
+            where TAtt : unmanaged, Components.IAttribute 
+            where TModAtt : unmanaged, Components.IAttributeModValue {
+            
+            [NativeDisableParallelForRestriction] [NativeDisableContainerSafetyRestriction]
+            public ComponentLookup<TAtt> attLookup;
+
+            [NativeDisableParallelForRestriction] [NativeDisableContainerSafetyRestriction]
+            public BufferLookup<Components.AttributeMod<TAtt, Components.AttributeModTypeAdd>> addModsLookup;
+            
+            [NativeDisableParallelForRestriction] [NativeDisableContainerSafetyRestriction]
+            public BufferLookup<Components.AttributeMod<TAtt, Components.AttributeModTypeMul>> mulModsLookup;
+            
+            [NativeDisableParallelForRestriction] [NativeDisableContainerSafetyRestriction]
+            public BufferLookup<Components.AttributeMod<TAtt, Components.AttributeModTypeExp>> expModsLookup;
+            
+            //public BufferLookup<Components.AttributeMod<TAtt, TModType>> modLookup;
+            public NativeStream requests;
+            public NativeQueue<AttributeManagerRequest>.ParallelWriter requestsQ;
+            
+            public void Execute(int index) {
+                //requests.AsReader().Read<AttributeModRequest<TAtt, TModType>>();
             }
         }
     }
