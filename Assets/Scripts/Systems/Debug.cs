@@ -22,9 +22,18 @@ namespace Metal.Systems {
         }
         
         public void OnStartRunning(ref SystemState state) {
-            Log.Debug("debug started");
             root = SystemAPI.GetSingletonEntity<Tags.Root>();
-            SystemAPI.GetComponent<Components.SpawnerQueue>(root).Request(new SpawnPrefabRequest() {
+            
+            // Spawns default player
+            NativeArray<AttributeModConstructor> mods = new (3, Allocator.Temp);
+            mods[0] = new (AttributeType.health, AttributeModType.addition, 100.0d, 15.0f);
+            mods[1] = new (AttributeType.health, AttributeModType.multiplier, 10.0d);
+            mods[2] = new (AttributeType.health, AttributeModType.exponent, 2.0d);
+            
+            NativeArray<AttributeConstructor> attributes = new(1, Allocator.Temp);
+            attributes[0] = new (AttributeType.health, 100.0d, mods);
+            
+            var spawnRequest = new SpawnPrefabRequest() {
                 type = SpawnPrefabRequestType.Vehicle_Hilux,
                 spawnTransform = new LocalTransform() {
                     Position = math.up() * 5.0f,
@@ -34,33 +43,11 @@ namespace Metal.Systems {
                 quantity = 1,
                 isPlayer = true,
                 isEnemy = false,
-                statValueConstructors = new NativeArray<ConstructStatValue>(new ConstructStatValue[] {
-                    new () {
-                        statValueType = StatValueType.health,
-                        value = 100.0d,
-                        clamped = true,
-                        locked = false,
-                        valueMax = double.MaxValue,
-                        valueMin = 0.0d,
-                    },
-                    new () {
-                        statValueType = StatValueType.movementSpeed,
-                        value = 100.0d,
-                        clamped = true,
-                        locked = false,
-                        valueMax = double.MaxValue,
-                        valueMin = 0.0d,
-                    },
-                    new () {
-                        statValueType = StatValueType.fireRate,
-                        value = 100.0d,
-                        clamped = true,
-                        locked = false,
-                        valueMax = double.MaxValue,
-                        valueMin = 0.0d,
-                    },
-                }, Allocator.Persistent)
-            });
+                attributeConstructors = attributes
+            };
+            mods.Dispose();
+            attributes.Dispose();
+            SystemAPI.GetComponent<Components.SpawnerQueue>(root).Request(spawnRequest);
         }
 
         public void OnUpdate(ref SystemState state) {
@@ -71,6 +58,13 @@ namespace Metal.Systems {
             if (UnityEngine.InputSystem.Keyboard.current.f7Key.isPressed || UnityEngine.InputSystem.Keyboard.current.f6Key.wasPressedThisFrame) {
                 SystemAPI.GetComponent<Components.SpawnerQueue>(root)
                     .Request(new SpawnPrefabRequest(SpawnPrefabRequestType.Vehicle_Hilux, 10));
+            }
+
+            if (SystemAPI.TryGetSingletonEntity<Tags.Player>(out player) &&
+                (UnityEngine.InputSystem.Keyboard.current.lKey.isPressed ||
+                 UnityEngine.InputSystem.Keyboard.current.kKey.wasPressedThisFrame)) {
+                SystemAPI.GetComponent<Components.AttributeQueue>(root)
+                    .Request(new(100.0d, player, AttributeType.health));
             }
         }
 

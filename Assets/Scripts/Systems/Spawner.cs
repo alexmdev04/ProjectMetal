@@ -1,4 +1,5 @@
 using System;
+using Metal.Components;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
@@ -40,11 +41,13 @@ namespace Metal {
 
             [BurstCompile]
             public void OnUpdate(ref SystemState state) {
+                NativeQueue<SpawnPrefabRequest> spawnerQueue = SystemAPI.GetComponentRO<Components.SpawnerQueue>(root).ValueRO.q; 
+                if (spawnerQueue.IsEmpty()) { return; }
+                
                 var ecb = SystemAPI.GetSingleton<BeginSimulationEntityCommandBufferSystem.Singleton>()
                     .CreateCommandBuffer(state.WorldUnmanaged).AsParallelWriter();
 
                 Components.SpawnerData spawnerData = SystemAPI.GetComponent<Components.SpawnerData>(root);
-                NativeQueue<SpawnPrefabRequest> spawnerQueue = SystemAPI.GetComponentRO<Components.SpawnerQueue>(root).ValueRO.q; 
                 NativeArray<SpawnPrefabRequest> spawnerArray = spawnerQueue.ToArray(Allocator.TempJob);
                 spawnerQueue.Clear();
 
@@ -56,7 +59,7 @@ namespace Metal {
                 
                 new SpawnerJob() {
                     spawnerData = spawnerData,
-                    spawnerArray = spawnerArray,
+                    spawnRequests = spawnerArray,
                     random = new Random(random.NextUInt()),
                     ecb = ecb,
                     playerFound = playerFound,
@@ -74,7 +77,7 @@ namespace Metal {
             }
 
             [BurstCompile]
-            public void OnStopRunning(ref SystemState state) {
+            public void OnStopRunning(ref SystemState state) { 
                 
             }
         }
@@ -84,14 +87,14 @@ namespace Metal {
             public EntityCommandBuffer.ParallelWriter ecb;
             public Components.SpawnerData spawnerData;
             [NativeDisableContainerSafetyRestriction]
-            public NativeArray<SpawnPrefabRequest> spawnerArray;
+            public NativeArray<SpawnPrefabRequest> spawnRequests;
             public bool playerFound;
             public float3 playerPosition;
             public Random random;
 
             [BurstCompile]
             public void Execute(int index) {
-                SpawnPrefabRequest request = spawnerArray[index];
+                SpawnPrefabRequest request = spawnRequests[index];
                 for (int i = 0; i < request.quantity; i++) {
                     
                     Entity newEntity = ecb.Instantiate(index, spawnerData.GetEntityPrefab(request.type));
@@ -123,40 +126,10 @@ namespace Metal {
                         ecb.SetComponent(index, newEntity, request.spawnTransform);
                     }
 
-                    if (request.statValueConstructors.IsCreated) {
-                        foreach (ConstructStatValue statValueConstructor in request.statValueConstructors) {
-                            switch (statValueConstructor.statValueType) {
-                                case StatValueType.none: {
-                                    throw new NotImplementedException();
-                                }
-                                case StatValueType.health: {
-                                    StatValue.Construct(statValueConstructor, 
-                                        out Components.StatValues.Health newStatValue);
-                                    ecb.AddComponent(index, newEntity, newStatValue);
-                                    break;
-                                }
-                                case StatValueType.cooldownRate: {
-                                    StatValue.Construct(statValueConstructor, 
-                                        out Components.StatValues.CooldownRate newStatValue);
-                                    ecb.AddComponent(index, newEntity, newStatValue);
-                                    break;
-                                }
-                                case StatValueType.fireRate: {
-                                    StatValue.Construct(statValueConstructor, 
-                                        out Components.StatValues.FireRate newStatValue);
-                                    ecb.AddComponent(index, newEntity, newStatValue);
-                                    break;
-                                }
-                                case StatValueType.movementSpeed: {
-                                    StatValue.Construct(statValueConstructor, 
-                                        out Components.StatValues.MovementSpeed newStatValue);
-                                    ecb.AddComponent(index, newEntity, newStatValue);
-                                    break;
-                                }
-                                default: {
-                                    throw new NotImplementedException();
-                                }
-                            }
+                    if (request.attributeConstructors.HasValue) {
+                        foreach (AttributeConstructor attributeConstructor in request.attributeConstructors) {
+                            ecb.AddAttribute(index, newEntity, attributeConstructor);
+                            break;
                         }
                     }
                     
@@ -188,14 +161,14 @@ namespace Metal {
         public bool isEnemy;
         public bool isPlayer;
         [NativeDisableContainerSafetyRestriction]
-        public NativeArray<ConstructStatValue> statValueConstructors;
+        public NativeArray<AttributeConstructor>? attributeConstructors;
         public LocalTransform spawnTransform;
         
         public SpawnPrefabRequest(
             SpawnPrefabRequestType type,
             bool isEnemy,
             LocalTransform spawnTransform,
-            NativeArray<ConstructStatValue>? statValueConstructors = null,
+            NativeArray<AttributeConstructor> attributeConstructors,
             uint quantity = 1,
             bool isPlayer = false) {
             this.type = type;
@@ -203,7 +176,20 @@ namespace Metal {
             this.quantity = quantity;
             this.isEnemy = isEnemy;
             this.isPlayer = isPlayer;
-            this.statValueConstructors = statValueConstructors.GetValueOrDefault();
+            this.attributeConstructors = attributeConstructors;
+        }
+        public SpawnPrefabRequest(
+            SpawnPrefabRequestType type,
+            bool isEnemy,
+            LocalTransform spawnTransform,
+            uint quantity = 1,
+            bool isPlayer = false) {
+            this.type = type;
+            this.spawnTransform = spawnTransform;
+            this.quantity = quantity;
+            this.isEnemy = isEnemy;
+            this.isPlayer = isPlayer;
+            this.attributeConstructors = null;
         }
         
         // this constructor represents most spawn requests
@@ -213,32 +199,7 @@ namespace Metal {
             this.spawnTransform = LocalTransform.Identity;
             this.isPlayer = false;
             this.isEnemy = true;
-            this.statValueConstructors = new NativeArray<ConstructStatValue>(new ConstructStatValue[] {
-                new () {
-                    statValueType = StatValueType.health,
-                    value = 100.0d,
-                    clamped = true,
-                    locked = false,
-                    valueMax = double.MaxValue,
-                    valueMin = 0.0d,
-                },
-                new () {
-                    statValueType = StatValueType.movementSpeed,
-                    value = 100.0d,
-                    clamped = true,
-                    locked = false,
-                    valueMax = double.MaxValue,
-                    valueMin = 0.0d,
-                },
-                new () {
-                    statValueType = StatValueType.fireRate,
-                    value = 100.0d,
-                    clamped = true,
-                    locked = false,
-                    valueMax = double.MaxValue,
-                    valueMin = 0.0d,
-                },
-            }, Allocator.Persistent);
+            this.attributeConstructors = null;
         }
     }
 }
