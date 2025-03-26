@@ -24,6 +24,8 @@ namespace Metal.Authoring {
                 playerEnemySpawnRadius = authoring.playerEnemySpawnRadius,
                 spawnerLogging = authoring.spawnerLogging
             });
+            
+            AddComponent(root, new Components.AttributeData());
 
             #if UNITY_EDITOR
             AddComponent(root, new Components.Debug(){});
