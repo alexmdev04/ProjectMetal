@@ -25,6 +25,8 @@ namespace Metal {
                 state.RequireForUpdate<BeginSimulationEntityCommandBufferSystem.Singleton>();
                 state.RequireForUpdate<Components.SpawnerData>();
                 state.RequireForUpdate<Tags.Root>();
+                state.RequireForUpdate<Components.AttributeManagerQueue>();
+                state.RequireForUpdate<Components.AttributeModManagerQueue>();
                 random = Random.CreateFromIndex((uint)math.lerp(0.0f, 9999999.9f, SystemAPI.Time.DeltaTime));
             }
 
@@ -58,6 +60,8 @@ namespace Metal {
                 }
                 
                 new SpawnerJob() {
+                    attributeManagerQueue = SystemAPI.GetComponent<AttributeManagerQueue>(root).q.AsParallelWriter(),
+                    attributeModManagerQueue = SystemAPI.GetComponent<AttributeModManagerQueue>(root).q.AsParallelWriter(),
                     spawnerData = spawnerData,
                     spawnRequests = spawnerArray,
                     random = new Random(random.NextUInt()),
@@ -85,6 +89,10 @@ namespace Metal {
         [BurstCompile]
         public struct SpawnerJob : IJobParallelFor {
             public EntityCommandBuffer.ParallelWriter ecb;
+            [NativeDisableParallelForRestriction] [NativeDisableContainerSafetyRestriction]
+            public NativeQueue<AttributeManagerRequest>.ParallelWriter attributeManagerQueue;
+            [NativeDisableParallelForRestriction] [NativeDisableContainerSafetyRestriction]
+            public NativeQueue<AttributeModManagerRequest>.ParallelWriter attributeModManagerQueue;
             public Components.SpawnerData spawnerData;
             [NativeDisableContainerSafetyRestriction]
             public NativeArray<SpawnPrefabRequest> spawnRequests;
@@ -128,7 +136,9 @@ namespace Metal {
 
                     if (request.attributeConstructors.HasValue) {
                         foreach (AttributeConstructor attributeConstructor in request.attributeConstructors) {
-                            ecb.AddAttribute(index, newEntity, attributeConstructor);
+                            attributeManagerQueue.Enqueue(
+                                AttributeManagerRequest.AddTemplate(newEntity, attributeConstructor)
+                            );
                             break;
                         }
                     }

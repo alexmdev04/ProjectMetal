@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using Unity.Burst;
 using Unity.Entities;
 using Unity.Physics;
@@ -7,6 +8,7 @@ using Unity.Mathematics;
 using Unity.Transforms;
 using Unity.Collections;
 using System.Linq;
+using JetBrains.Annotations;
 using Metal.Components;
 using UnityEditor;
 using UnityEngine;
@@ -282,7 +284,7 @@ namespace Metal {
             int length = attributeModifiers.Length, 
                 i = 0;
             while (i < length) {
-                AttributeModInternal mod = attributeModifiers[i].mod;
+                AttributeModInternal mod = attributeModifiers[i].data;
                 mod.Tick(delta);
                 if (!mod.dead) { i++; continue; }
                 attributeModifiers[i] = attributeModifiers[^1];
@@ -291,179 +293,263 @@ namespace Metal {
             }
         }
 
-        [BurstCompile]
-        public static void AddAttribute<TAtt, TModAtt>(
-            this ref EntityCommandBuffer.ParallelWriter ecb,
-            in int index,
-            in Entity entity,
-            in double baseValue, 
-            in double minModValue = Double.MinValue, 
-            in double maxModValue = Double.MaxValue)
-            where TAtt : unmanaged, IAttribute
-            where TModAtt : unmanaged, IAttributeModValue {
+        public static void AttributeManagerRequestCreator() {
             
-            ecb.AddComponent(index, entity, new TAtt {
-                att = new Components.AttributeInternal(baseValue, minModValue, maxModValue),
-                modsChanged = true
-            });
-            ecb.AddComponent<TModAtt>(index, entity);
-            ecb.AddBuffer<AttributeMod<TAtt, AttributeModTypeAdd>>(index, entity);
-            ecb.AddBuffer<AttributeMod<TAtt, AttributeModTypeMul>>(index, entity);
-            ecb.AddBuffer<AttributeMod<TAtt, AttributeModTypeExp>>(index, entity);
         }
         
-        [BurstCompile]
-        public static void AddAttribute<TAtt, TModAtt>(
-            this ref EntityCommandBuffer.ParallelWriter ecb,
-            in int index,
-            in Entity entity,
-            in double baseValue, 
-            in NativeArray<AttributeModConstructor> mods,
-            in double minModValue = Double.MinValue, 
-            in double maxModValue = Double.MaxValue)
-            where TAtt : unmanaged, IAttribute
-            where TModAtt : unmanaged, IAttributeModValue {
-
-            ecb.AddComponent(index, entity, new TAtt {
-                att = new Components.AttributeInternal(baseValue, minModValue, maxModValue),
-                modsChanged = true
-            });
-            ecb.AddComponent<TModAtt>(index, entity);
-            var addMods = ecb.AddBuffer<AttributeMod<TAtt, AttributeModTypeAdd>>(index, entity);
-            var mulMods = ecb.AddBuffer<AttributeMod<TAtt, AttributeModTypeMul>>(index, entity);
-            var expMods = ecb.AddBuffer<AttributeMod<TAtt, AttributeModTypeExp>>(index, entity);
-            foreach (AttributeModConstructor modConstructor in mods) { // attribute type is already known so its not used
-                switch (modConstructor.modType) {
-                    case AttributeModType.addition: {
-                        addMods.Add(new AttributeMod<TAtt, AttributeModTypeAdd>(modConstructor));
-                        break;
-                    }
-                    case AttributeModType.multiplier: {
-                        mulMods.Add(new AttributeMod<TAtt, AttributeModTypeMul>(modConstructor));
-                        break;
-                    }
-                    case AttributeModType.exponent: {
-                        expMods.Add(new AttributeMod<TAtt, AttributeModTypeExp>(modConstructor));
-                        break;
-                    }
-                }
-            }
-        }
         
-        [BurstCompile]
-        public static void AddAttribute<TAtt, TModAtt>(
-            this ref EntityCommandBuffer.ParallelWriter ecb,
-            in int index,
-            in Entity entity,
-            in AttributeConstructor constructor)
-            where TAtt : unmanaged, IAttribute
-            where TModAtt : unmanaged, IAttributeModValue {
-
-            ecb.AddComponent(index, entity, new TAtt {
-                att = new Components.AttributeInternal(constructor.baseValue, constructor.minModValue, constructor.maxModValue),
-                modsChanged = true
-            });
-            var addMods = ecb.AddBuffer<AttributeMod<TAtt, AttributeModTypeAdd>>(index, entity);
-            var mulMods = ecb.AddBuffer<AttributeMod<TAtt, AttributeModTypeMul>>(index, entity);
-            var expMods = ecb.AddBuffer<AttributeMod<TAtt, AttributeModTypeExp>>(index, entity);
-            
-            if (!constructor.modConstructors.HasValue) return;
-            foreach (AttributeModConstructor modConstructor in constructor.modConstructors) {
-                // attribute type is already known so its not used
-                switch (modConstructor.modType) {
-                    case AttributeModType.addition: {
-                        addMods.Add(new AttributeMod<TAtt, AttributeModTypeAdd>(modConstructor));
-                        break;
-                    }
-                    case AttributeModType.multiplier: {
-                        mulMods.Add(new AttributeMod<TAtt, AttributeModTypeMul>(modConstructor));
-                        break;
-                    }
-                    case AttributeModType.exponent: {
-                        expMods.Add(new AttributeMod<TAtt, AttributeModTypeExp>(modConstructor));
-                        break;
-                    }
-                }
-            }
-            new AttributeModSet<TAtt>(addMods, mulMods, expMods).CalculateModValue(constructor.baseValue, out double modValue);
-            ecb.AddComponent(index, entity, new TModAtt{ value = modValue, maxValue = modValue });
-        }
-
-        public static void AddAttribute(
-            this ref EntityCommandBuffer.ParallelWriter ecb,
-            in int index,
-            in Entity entity,
-            in AttributeConstructor constructor) {
-            switch (constructor.type) {
-                case AttributeType.health: {
-                    AddAttribute<AttHealthBase, AttHealthModValue>(ref ecb, index, entity, constructor);
-                    break;
-                }
-                default:
-                    throw new ArgumentOutOfRangeException();
-            }
-        }
-        
-        [BurstCompile]
-        public static void AddModToAttribute<TAtt, TModType>(
-            this ref EntityCommandBuffer.ParallelWriter ecb,
-            in int index,
-            in Entity entity,
-            RefRW<TAtt> att, 
-            in AttributeMod<TAtt, TModType> mod) 
-            where TAtt : unmanaged, IAttribute 
-            where TModType : unmanaged, IAttributeModType {
-            
-            ecb.AppendToBuffer(index, entity, mod);
-            att.ValueRW.modsChanged = true;
-        }
-
-        // public static void RemoveModFromAttribute(in AttributeModRef modRef) {
-        //     EntityCommandBuffer.ParallelWriter ecb = new ();
-        //     //DynamicBuffer<AttributeMod<TAtt, TModType>> foo;
-        //     // buffer lookup, remove mod, set buffer
+        // [BurstCompile]
+        // public static void AddAttribute<TAtt, TModAtt>(
+        //     this ref EntityCommandBuffer.ParallelWriter ecb,
+        //     in int index,
+        //     in Entity entity,
+        //     in AttributeConstructor constructor)
+        //     where TAtt : unmanaged, IAttribute
+        //     where TModAtt : unmanaged, IAttributeModValue {
         //
-        //     switch (modRef.attributeType) {
-        //         case AttributeType.health: {
-        //             switch (modRef.modType) {
-        //                 case AttributeModType.addition: {
-        //                     
-        //                     RemoveModFromAttribute<AttHealthBase, AttributeModTypeAdd>(modRef.entity, modRef.index);
-        //                     break;
-        //                 }
-        //                 case AttributeModType.multiplier: {
-        //                     break;
-        //                 }
-        //                 case AttributeModType.exponent: {
-        //                     break;
-        //                 }
+        //     ecb.AddComponent(index, entity, new TAtt {
+        //         att = new Components.AttributeInternal(constructor.baseValue, constructor.minModValue, constructor.maxModValue),
+        //         modsChanged = true
+        //     });
+        //     var addMods = ecb.AddBuffer<AttributeMod<TAtt, AttributeModTypeAdd>>(index, entity);
+        //     var mulMods = ecb.AddBuffer<AttributeMod<TAtt, AttributeModTypeMul>>(index, entity);
+        //     var expMods = ecb.AddBuffer<AttributeMod<TAtt, AttributeModTypeExp>>(index, entity);
+        //     
+        //     if (!constructor.modConstructors.HasValue) return;
+        //     foreach (AttributeModConstructor modConstructor in constructor.modConstructors) {
+        //         // attribute type is already known so its not used
+        //         switch (modConstructor.modType) {
+        //             case AttributeModType.addition: {
+        //                 addMods.Add(new AttributeMod<TAtt, AttributeModTypeAdd>(modConstructor));
+        //                 break;
         //             }
+        //             case AttributeModType.multiplier: {
+        //                 mulMods.Add(new AttributeMod<TAtt, AttributeModTypeMul>(modConstructor));
+        //                 break;
+        //             }
+        //             case AttributeModType.exponent: {
+        //                 expMods.Add(new AttributeMod<TAtt, AttributeModTypeExp>(modConstructor));
+        //                 break;
+        //             }
+        //         }
+        //     }
+        //     new AttributeModSet<TAtt>(addMods, mulMods, expMods).CalculateModValue(constructor.baseValue, out double modValue);
+        //     ecb.AddComponent(index, entity, new TModAtt{ value = modValue, maxValue = modValue });
+        // }
+        //
+        // [BurstCompile]
+        // public static void AddAttribute<TAtt, TModAtt>(
+        //     this in EntityCommandBuffer ecb,
+        //     in Entity entity,
+        //     in AttributeConstructor constructor)
+        //     where TAtt : unmanaged, IAttribute
+        //     where TModAtt : unmanaged, IAttributeModValue {
+        //
+        //     ecb.AddComponent(entity, new TAtt {
+        //         att = new Components.AttributeInternal(constructor.baseValue, constructor.minModValue, constructor.maxModValue),
+        //         modsChanged = true
+        //     });
+        //     var addMods = ecb.AddBuffer<AttributeMod<TAtt, AttributeModTypeAdd>>(entity);
+        //     var mulMods = ecb.AddBuffer<AttributeMod<TAtt, AttributeModTypeMul>>(entity);
+        //     var expMods = ecb.AddBuffer<AttributeMod<TAtt, AttributeModTypeExp>>(entity);
+        //     
+        //     if (!constructor.modConstructors.HasValue) return;
+        //     foreach (AttributeModConstructor modConstructor in constructor.modConstructors) {
+        //         // attribute type is already known so its not used
+        //         switch (modConstructor.modType) {
+        //             case AttributeModType.addition: {
+        //                 addMods.Add(new AttributeMod<TAtt, AttributeModTypeAdd>(modConstructor));
+        //                 break;
+        //             }
+        //             case AttributeModType.multiplier: {
+        //                 mulMods.Add(new AttributeMod<TAtt, AttributeModTypeMul>(modConstructor));
+        //                 break;
+        //             }
+        //             case AttributeModType.exponent: {
+        //                 expMods.Add(new AttributeMod<TAtt, AttributeModTypeExp>(modConstructor));
+        //                 break;
+        //             }
+        //         }
+        //     }
+        //     new AttributeModSet<TAtt>(addMods, mulMods, expMods).CalculateModValue(constructor.baseValue, out double modValue);
+        //     ecb.AddComponent(entity, new TModAtt{ value = modValue, maxValue = modValue });
+        // }
+        //
+        // public static void AddAttribute(
+        //     this ref EntityCommandBuffer.ParallelWriter ecb,
+        //     in int index,
+        //     in Entity entity,
+        //     in AttributeConstructor constructor) {
+        //     switch (constructor.type) {
+        //         case AttributeType.health: {
+        //             AddAttribute<AttHealthBase, AttHealthModValue>(ref ecb, index, entity, constructor);
         //             break;
         //         }
-        //         case AttributeType.damage:
-        //             break;
-        //         case AttributeType.fireRate:
-        //             break;
-        //         case AttributeType.cooldownRate:
-        //             break;
-        //         case AttributeType.accelerationSpeed:
-        //             break;
-        //         case AttributeType.traction:
-        //             break;
         //         default:
         //             throw new ArgumentOutOfRangeException();
         //     }
         // }
+        //
+        // public static void AddAttribute(
+        //     this in EntityCommandBuffer ecb,
+        //     in Entity entity,
+        //     in AttributeConstructor constructor) {
+        //     switch (constructor.type) {
+        //         case AttributeType.health: {
+        //             AddAttribute<AttHealthBase, AttHealthModValue>(ecb, entity, constructor);
+        //             break;
+        //         }
+        //         default:
+        //             throw new ArgumentOutOfRangeException();
+        //     }
+        // }
+        //
+        // public static void EditAttribute(
+        //     this ref EntityCommandBuffer.ParallelWriter ecb,
+        //     in int index,
+        //     in Entity entity,
+        //     in AttributeConstructor constructor) {
+        //     switch (constructor.type) {
+        //         case AttributeType.health: {
+        //             ecb.SetComponent<AttHealthBase>(index, entity, new () {
+        //                 att = new AttributeInternal(constructor.baseValue, constructor.minModValue, constructor.maxModValue),
+        //                 modsChanged = true
+        //             });
+        //             break;
+        //         }
+        //         default:
+        //             throw new ArgumentOutOfRangeException();
+        //     }
+        // }
+        //
+        // public static void EditAttribute(
+        //     this in EntityCommandBuffer ecb,
+        //     in Entity entity,
+        //     in AttributeConstructor constructor) {
+        //     switch (constructor.type) {
+        //         case AttributeType.health: {
+        //             ecb.SetComponent<AttHealthBase>(entity, new () {
+        //                 att = new AttributeInternal(constructor.baseValue, constructor.minModValue, constructor.maxModValue),
+        //                 modsChanged = true
+        //             });
+        //             break;
+        //         }
+        //         default:
+        //             throw new ArgumentOutOfRangeException();
+        //     }
+        // }
+        //
+        // public static void RemoveAttribute(
+        //     this ref EntityCommandBuffer.ParallelWriter ecb,
+        //     in int index,
+        //     in Entity entity,
+        //     in AttributeType type) {
+        //     switch (type) {
+        //         case AttributeType.health: {
+        //             ecb.RemoveAttribute<AttHealthBase>(index, entity);
+        //             break;
+        //         }
+        //         default:
+        //             throw new ArgumentOutOfRangeException();
+        //     }
+        // }
+        //
+        // public static void RemoveAttribute(
+        //     this in EntityCommandBuffer ecb,
+        //     in Entity entity,
+        //     in AttributeType type) {
+        //     switch (type) {
+        //         case AttributeType.health: {
+        //             ecb.RemoveAttribute<AttHealthBase>(entity);
+        //             break;
+        //         }
+        //         default:
+        //             throw new ArgumentOutOfRangeException();
+        //     }
+        // }
+        //
+        // public static void RemoveAttribute<TAtt>(
+        //     this ref EntityCommandBuffer.ParallelWriter ecb,
+        //     in int index,
+        //     in Entity entity)
+        //     where TAtt : unmanaged, IAttribute {
+        //     ecb.RemoveComponent<TAtt>(index, entity);
+        //     ecb.RemoveComponent<DynamicBuffer<AttributeMod<TAtt, AttributeModTypeAdd>>>(index, entity);
+        //     ecb.RemoveComponent<DynamicBuffer<AttributeMod<TAtt, AttributeModTypeMul>>>(index, entity);
+        //     ecb.RemoveComponent<DynamicBuffer<AttributeMod<TAtt, AttributeModTypeExp>>>(index, entity);
+        // }
+        //
+        // public static void RemoveAttribute<TAtt>(
+        //     this in EntityCommandBuffer ecb,
+        //     in Entity entity)
+        //     where TAtt : unmanaged, IAttribute {
+        //     ecb.RemoveComponent<TAtt>(entity);
+        //     ecb.RemoveComponent<DynamicBuffer<AttributeMod<TAtt, AttributeModTypeAdd>>>(entity);
+        //     ecb.RemoveComponent<DynamicBuffer<AttributeMod<TAtt, AttributeModTypeMul>>>(entity);
+        //     ecb.RemoveComponent<DynamicBuffer<AttributeMod<TAtt, AttributeModTypeExp>>>(entity);
+        // }
+        //
+        // [BurstCompile]
+        // public static void AddAttributeMod<TAtt, TModType>(
+        //     in BufferLookup<AttributeMod<TAtt, TModType>> modLookup,
+        //     in AttributeModManagerRequest<TAtt> request,
+        //     RefRW<TAtt> att) 
+        //     where TAtt : unmanaged, IAttribute 
+        //     where TModType : unmanaged, IAttributeModType {
+        //
+        //     request.modRefPointer.Get(out var modRef);
+        //     modRef.index = modLookup[modRef.entity].Add(new AttributeMod<TAtt, TModType>(request.constructor));
+        //     request.modRefPointer.Set(modRef);
+        //     att.ValueRW.modsChanged = true;
+        // }
+        //
+        // public static void EditAttributeMod<TAtt, TModType>(
+        //     in BufferLookup<AttributeMod<TAtt, TModType>> modLookup,
+        //     in AttributeModManagerRequest<TAtt> request,
+        //     RefRW<TAtt> att) 
+        //     where TAtt : unmanaged, IAttribute 
+        //     where TModType : unmanaged, IAttributeModType {
+        //
+        //     request.modRefPointer.Get(out var modRef);
+        //     var mod = modLookup[modRef.entity].ElementAt(modRef.index);
+        //     mod.data.value = request.constructor.value;
+        //     mod.data.lifeTime = request.constructor.lifeTime;
+        //     mod.data.expires = request.constructor.expires;
+        //     modLookup[modRef.entity].ElementAt(modRef.index) = mod;
+        //     att.ValueRW.modsChanged = true;
+        // }
+        //
+        // public static void RemoveAttributeMod<TAtt, TModType>(
+        //     in BufferLookup<AttributeMod<TAtt, TModType>> modLookup,
+        //     in AttributeModManagerRequest<TAtt> request,
+        //     RefRW<TAtt> att)
+        //     where TAtt : unmanaged, IAttribute 
+        //     where TModType : unmanaged, IAttributeModType {
+        //     
+        //     request.modRefPointer.Get(out var modRef);
+        //     modLookup[modRef.entity].ElementAt(modRef.index).data = AttributeModInternal.Null;
+        //     request.modRefPointer.Dispose();
+        //     att.ValueRW.modsChanged = true;
+        // }
+        
+        // [BurstDiscard]
+        // public static AttributeType AttributeTypeToEnum<TAtt>() where TAtt : unmanaged, IAttribute {
+        //     return typeof(TAtt).Name switch {
+        //         "AttHealthBase" => AttributeType.health,
+        //         _ => throw new ArgumentOutOfRangeException()
+        //     };
+        // }
+        //
+        // [BurstDiscard]
+        // public static AttributeModType AttributeModTypeToEnum<TModType>() where TModType : unmanaged, IAttributeModType {
+        //     return typeof(TModType).Name switch {
+        //         "AttributeModTypeAdd" => AttributeModType.addition,
+        //         "AttributeModTypeMul" => AttributeModType.multiplier,
+        //         "AttributeModTypeExp" => AttributeModType.exponent,
+        //         _ => throw new ArgumentOutOfRangeException()
+        //     };
+        // }
 
-        public static void RemoveModFromAttribute<TAtt, TModType>(
-            in BufferLookup<AttributeMod<TAtt,TModType>> lookup,
-            in Entity entity,
-            in int index)
-            where TAtt : unmanaged, IAttribute 
-            where TModType : unmanaged, IAttributeModType {
-            
-            lookup[entity].RemoveAtSwapBack(index);
-        }
         
         // [BurstCompile]
         // public static void SquashList<T>(this in NativeList<T> list) where T : unmanaged {

@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.InteropServices;
 using Metal.Components;
 using Unity.Collections;
 using Unity.Entities;
@@ -84,29 +85,29 @@ namespace Metal {
         }
         public void CalculateModValue(in double baseValue, out double value) {
             value = baseValue;
-            foreach (var mod in add) { value += mod.mod.value; } 
-            foreach (var mod in mul) { value *= mod.mod.value; } 
-            foreach (var mod in exp) { value = math.pow(value, mod.mod.value); }
+            foreach (var mod in add) { value += mod.data.value; } 
+            foreach (var mod in mul) { value *= mod.data.value; } 
+            foreach (var mod in exp) { value = math.pow(value, mod.data.value); }
         }
         public void CalculateModValue(in TAtt att, out double value) {
             value = att.att.baseValue;
-            foreach (var mod in add) { value += mod.mod.value; } 
-            foreach (var mod in mul) { value *= mod.mod.value; } 
-            foreach (var mod in exp) { value = math.pow(value, mod.mod.value); }
+            foreach (var mod in add) { value += mod.data.value; } 
+            foreach (var mod in mul) { value *= mod.data.value; } 
+            foreach (var mod in exp) { value = math.pow(value, mod.data.value); }
         }
         public void CalculateBaseValue(in double modValue, out double baseValue) {
             baseValue = modValue;
-            foreach (var mod in exp) { baseValue = Extensions.InversePow(modValue, mod.mod.value); }
-            foreach (var mod in mul) { baseValue /= mod.mod.value; } 
-            foreach (var mod in add) { baseValue -= mod.mod.value; } 
+            foreach (var mod in exp) { baseValue = Extensions.InversePow(modValue, mod.data.value); }
+            foreach (var mod in mul) { baseValue /= mod.data.value; } 
+            foreach (var mod in add) { baseValue -= mod.data.value; } 
         }
         public void CalculateBaseValue<TModAtt>(in TModAtt modAtt, out double baseValue)
             where TModAtt : unmanaged, Components.IAttributeModValue {
                 
             baseValue = modAtt.maxValue;
-            foreach (var mod in exp) { baseValue = Extensions.InversePow(modAtt.maxValue, mod.mod.value); }
-            foreach (var mod in mul) { baseValue /= mod.mod.value; } 
-            foreach (var mod in add) { baseValue -= mod.mod.value; } 
+            foreach (var mod in exp) { baseValue = Extensions.InversePow(modAtt.maxValue, mod.data.value); }
+            foreach (var mod in mul) { baseValue /= mod.data.value; } 
+            foreach (var mod in add) { baseValue -= mod.data.value; } 
         }
     }
 
@@ -162,32 +163,6 @@ namespace Metal {
                 @internal.baseValue = value;
                 att = @internal;
             }
-            
-            // public void AddModifier(in AttributeModInternal mod, in AttributeModType type, out int modIndex);
-            // public void _AddModifier(in AttributeModInternal mod, in AttributeModType type, out int modIndex) {
-            //     _GetListFromType(type, out NativeList<AttributeModInternal> modList);
-            //     modIndex = modList.Length;
-            //     modList.Add(mod);
-            //     isDirty = true;
-            // }
-            //
-            // public void RemoveModifier(in AttributeModType type, in int modIndex);
-            // public void _RemoveModifier(in AttributeModType type, in int modIndex) {
-            //     _GetListFromType(type, out NativeList<AttributeModInternal> modList);
-            //     modList[modIndex] = modList[^1];
-            //     modList.TrimExcess();
-            //     isDirty = true;
-            // }
-            //
-            // public void GetListFromType(in AttributeModType type, out NativeList<AttributeModInternal> modList);
-            // public void _GetListFromType(in AttributeModType type, out NativeList<AttributeModInternal> modList) {
-            //     modList = type switch {
-            //         AttributeModType.addition => att.addMods,
-            //         AttributeModType.multiplier => att.mulMods,
-            //         AttributeModType.exponent => att.expMods,
-            //         _ => throw new ArgumentOutOfRangeException(nameof(type), type, null)
-            //     };
-            // }
         }
         
         [Serializable]
@@ -206,16 +181,26 @@ namespace Metal {
         public struct AttHealthBase : IAttribute {
             [field: SerializeField] public AttributeInternal att { get; set; }
             [field: SerializeField] public bool modsChanged { get; set; }
-            
-            // public void AddModifier(in AttributeModInternal mod, in AttributeModType type, out int modIndex) {
-            //     (this as IAttribute)._AddModifier(mod, type, out modIndex);
-            // }
-            // public void RemoveModifier(in AttributeModType type, in int modIndex) {
-            //     (this as IAttribute)._RemoveModifier(type, modIndex);
-            // }
-            // public void GetListFromType(in AttributeModType type, out NativeList<AttributeModInternal> modList) {
-            //     (this as IAttribute)._GetListFromType(type, out modList);
-            // }
+        }
+        public struct AttDamageBase : IAttribute {
+            [field: SerializeField] public AttributeInternal att { get; set; }
+            [field: SerializeField] public bool modsChanged { get; set; }
+        }
+        public struct AttFireRateBase : IAttribute {
+            [field: SerializeField] public AttributeInternal att { get; set; }
+            [field: SerializeField] public bool modsChanged { get; set; }
+        }
+        public struct AttCooldownRateBase : IAttribute {
+            [field: SerializeField] public AttributeInternal att { get; set; }
+            [field: SerializeField] public bool modsChanged { get; set; }
+        }
+        public struct AttAccelerationSpeedBase : IAttribute {
+            [field: SerializeField] public AttributeInternal att { get; set; }
+            [field: SerializeField] public bool modsChanged { get; set; }
+        }
+        public struct AttTractionBase : IAttribute {
+            [field: SerializeField] public AttributeInternal att { get; set; }
+            [field: SerializeField] public bool modsChanged { get; set; }
         }
         #endregion
         
@@ -231,15 +216,19 @@ namespace Metal {
             public double value;
             public bool expires;
             public bool dead;
-            public uint id;
             public float lifeTime;
 
+            public static AttributeModInternal Null = new() {
+                value = 0.0d,
+                expires = false,
+                dead = true,
+                lifeTime = 0.0f
+            };
+            
             public AttributeModInternal(
-                in uint id,
                 in double value,
                 in bool expires = false,
                 in float lifeTime = 0.0f) {
-                this.id = id;
                 this.expires = expires;
                 this.lifeTime = lifeTime;
                 this.value = value;
@@ -247,7 +236,6 @@ namespace Metal {
             }
 
             public AttributeModInternal(AttributeModConstructor constructor) {
-                this.id = constructor.id;
                 this.value = constructor.value;
                 this.expires = constructor.expires;
                 this.lifeTime = constructor.lifeTime;
@@ -264,16 +252,37 @@ namespace Metal {
             [field: SerializeField] public double maxValue { get; set; }
             [field: SerializeField] public double value { get; set; }
         }
+        public struct AttDamageModValue : IAttributeModValue {
+            [field: SerializeField] public double maxValue { get; set; }
+            [field: SerializeField] public double value { get; set; }
+        }
+        public struct AttFireRateModValue : IAttributeModValue {
+            [field: SerializeField] public double maxValue { get; set; }
+            [field: SerializeField] public double value { get; set; }
+        }
+        public struct AttCooldownRateModValue : IAttributeModValue {
+            [field: SerializeField] public double maxValue { get; set; }
+            [field: SerializeField] public double value { get; set; }
+        }
+        public struct AttAccelerationSpeedModValue : IAttributeModValue {
+            [field: SerializeField] public double maxValue { get; set; }
+            [field: SerializeField] public double value { get; set; }
+        }
+        public struct AttTractionModValue : IAttributeModValue {
+            [field: SerializeField] public double maxValue { get; set; }
+            [field: SerializeField] public double value { get; set; }
+        }
+        
         #endregion
 
         #region Attribute Mod Values and Mods
         public struct AttributeMod<TAtt, TModType> : IBufferElementData
             where TAtt : unmanaged, IAttribute 
             where TModType : unmanaged, IAttributeModType {
-            public AttributeModInternal mod;
+            public AttributeModInternal data;
 
             public AttributeMod(AttributeModConstructor constructor) {
-                mod = new AttributeModInternal(constructor);
+                data = new AttributeModInternal(constructor);
             }
         }
         
@@ -283,5 +292,42 @@ namespace Metal {
         public struct AttributeModTypeMul : IAttributeModType { }
         public struct AttributeModTypeExp : IAttributeModType { }
         #endregion
+    }
+    
+    public unsafe struct AttributeModRefPointer {
+        private AttributeModRef* data;
+        
+        public void Allocate(out AttributeModRefPointer pointer) {
+            data = (AttributeModRef*)Marshal.AllocHGlobal(sizeof(AttributeModRef));
+            *data = new AttributeModRef() {
+                entity = Entity.Null,
+                index = -1,
+                attributeType = AttributeType.none,
+                modType = (AttributeModType)(-1)
+            };
+            pointer = this;
+        }
+        
+        public void Allocate(in AttributeModRef modRef, out AttributeModRefPointer pointer) {
+            data = (AttributeModRef*)Marshal.AllocHGlobal(sizeof(AttributeModRef));
+            *data = modRef;
+            pointer = this;
+        }
+
+        public void Dispose() {
+            if (data == null) return;
+            Marshal.FreeHGlobal((IntPtr)data);
+            data = null;
+        }
+        
+        public void Get(out AttributeModRef _data) {
+            if (data == null) throw new NullReferenceException();
+            _data = *data;
+        }
+
+        public void Set(in AttributeModRef _data) {
+            if (data == null) throw new NullReferenceException();
+            *data = _data;
+        }
     }
 }
