@@ -16,8 +16,8 @@ namespace Metal.Authoring {
             traffic
         }
         public VehicleType vehicleType;
-        public Transform[]
-            wheelTransforms;
+        public Transform[] wheelTransforms;
+        public GameObject weaponMountObject;
         public float restLength = 1f;
         public float springTravel = 0.5f;
         public float wheelRadius = 0.33f;
@@ -43,7 +43,8 @@ namespace Metal.Authoring {
         public override void Bake(Vehicle authoring) {
             Entity vehicle = GetEntity(TransformUsageFlags.Dynamic);
             Entity vehicleAsset = GetEntity(authoring.vehicleAssets.dict[authoring.vehicleType], TransformUsageFlags.Dynamic);
-            AddComponent<Components.Movement>(vehicle);
+            Entity weaponMountEntity = GetEntity(authoring.weaponMountObject, TransformUsageFlags.Dynamic);
+            AddComponent<Components.Controller>(vehicle);
             AddComponent<Tags.Controller.Player>(vehicle);
 
             int turningCurveSampleCount = 64;
@@ -80,6 +81,7 @@ namespace Metal.Authoring {
                 enableSteering = true,
                 enableDrag = true,
                 enableSuspension = true,
+                weaponMountEntity = weaponMountEntity
                 //wheelPositions = wheelPositions
             });
 

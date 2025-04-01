@@ -23,6 +23,8 @@ namespace Metal.Components {
             enableSteering, 
             enableDrag;
 
+        public Entity weaponMountEntity;
+
         public BlobAssetReference<FloatArrayBlob> turningCurve;
         
         public float3 accelerationPointOffset;
