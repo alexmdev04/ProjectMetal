@@ -86,11 +86,11 @@ namespace Metal.Systems {
             RefRO<LocalTransform> vehicleTransform,
             RefRO<PhysicsMass> vehicleMass, 
             RefRW<PhysicsVelocity> vehicleVelocity,
-            RefRO<Components.Movement> movement) {
+            RefRO<Components.Controller> movement) {
 
             float3 linearVelocityAccumulated = float3.zero;
             float3 angularVelocityAccumulated = float3.zero;
-            float3 inputDirection = movement.ValueRO.input;
+            float3 inputDirection = movement.ValueRO.movementInput;
             // assumed vehicle is a uniformly scaled orphan object, so TransformHelpers.ComputeWorldTransformMatrix is not needed
             float4x4 vehicleTransformMatrix = vehicleTransform.ValueRO.ToMatrix();
             float3 vehicleWorldCenterOfMass = vehicleTransformMatrix.TransformPoint(vehicleMass.ValueRO.CenterOfMass);
@@ -205,13 +205,13 @@ namespace Metal.Systems {
         [ReadOnly] public float speed;
         [BurstCompile]
         public void Execute(
-            RefRO<Components.Movement> movementInput,
+            RefRO<Components.Controller> movementInput,
             RefRW<LocalTransform> transform,
             in Tags.Movement.Humanoid filter1) {
             
-            transform.ValueRW.Position += movementInput.ValueRO.input * speed * deltaTime;
-            if (!(math.lengthsq(movementInput.ValueRO.input.xz) > float.Epsilon)) { return; }
-            float3 forwardDir = movementInput.ValueRO.input;
+            transform.ValueRW.Position += movementInput.ValueRO.movementInput * speed * deltaTime;
+            if (!(math.lengthsq(movementInput.ValueRO.movementInput.xz) > float.Epsilon)) { return; }
+            float3 forwardDir = movementInput.ValueRO.movementInput;
             forwardDir.y = 0.0f;
             transform.ValueRW.Rotation = quaternion.LookRotation(forwardDir, math.up());
         }

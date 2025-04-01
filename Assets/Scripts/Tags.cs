@@ -8,7 +8,7 @@ namespace Metal.Tags {
     namespace Controller {
         public struct Player : IComponentData { }
         
-        public struct Pathed : IComponentData { }
+        public struct Enemy : IComponentData { }
     }
 
     namespace Movement {
