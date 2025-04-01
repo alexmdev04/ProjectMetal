@@ -1,4 +1,5 @@
 #if UNITY_EDITOR
+using Metal.Components;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
@@ -10,19 +11,17 @@ namespace Metal.Systems {
     [UpdateBefore(typeof(Spawner))]
     [UpdateInGroup(typeof(SimulationSystemGroup), OrderFirst = true)]
     public partial struct Debug : ISystem, ISystemStartStop {
-        private Entity
-            root,
-            player;
+        public Entity player;
         
         public void OnCreate(ref SystemState state) {
+            state.RequireForUpdate<AttributeQueue>();
             state.RequireForUpdate<Components.SpawnerData>();
             state.RequireForUpdate<Components.SpawnerQueue>();
-            state.RequireForUpdate<Tags.Root>();
             state.RequireForUpdate<Components.Input>();
         }
         
         public void OnStartRunning(ref SystemState state) {
-            root = SystemAPI.GetSingletonEntity<Tags.Root>();
+            state.EntityManager.AddComponentData(state.SystemHandle, new Components.Debug());
             
             // Spawns default player
             NativeArray<AttributeModConstructor> mods = new (3, Allocator.Temp);
@@ -30,8 +29,12 @@ namespace Metal.Systems {
             mods[1] = new (AttributeType.health, AttributeModType.multiplier, 10.0d);
             mods[2] = new (AttributeType.health, AttributeModType.exponent, 2.0d);
             
-            NativeArray<AttributeConstructor> attributes = new(1, Allocator.Temp);
+            NativeArray<AttributeConstructor> attributes = new(5, Allocator.Temp);
             attributes[0] = new (AttributeType.health, 100.0d, mods);
+            attributes[1] = new AttributeConstructor(AttributeType.damage, 10.0d);
+            attributes[2] = new AttributeConstructor(AttributeType.accelerationSpeed, 15.0d);
+            attributes[3] = new AttributeConstructor(AttributeType.cooldownRate, 1.0d);
+            attributes[4] = new AttributeConstructor(AttributeType.fireRate, 1.0d);
             
             var spawnRequest = new SpawnPrefabRequest() {
                 type = SpawnPrefabRequestType.Vehicle_Hilux,
@@ -45,25 +48,26 @@ namespace Metal.Systems {
                 isEnemy = false,
                 attributeConstructors = attributes
             };
-            mods.Dispose();
-            attributes.Dispose();
-            SystemAPI.GetComponent<Components.SpawnerQueue>(root).Request(spawnRequest);
+            //mods.Dispose();
+            //attributes.Dispose();
+            SystemAPI.GetSingleton<Components.SpawnerQueue>().Request(spawnRequest);
         }
 
         public void OnUpdate(ref SystemState state) {
+            //Log.Debug("[Debug] //////////// Update Begin ////////////");
             if (UnityEngine.InputSystem.Keyboard.current.f5Key.wasPressedThisFrame) {
                 new DebugVehicleResetTransform().Schedule();
             }
             
             if (UnityEngine.InputSystem.Keyboard.current.f7Key.isPressed || UnityEngine.InputSystem.Keyboard.current.f6Key.wasPressedThisFrame) {
-                SystemAPI.GetComponent<Components.SpawnerQueue>(root)
+                SystemAPI.GetSingleton<Components.SpawnerQueue>()
                     .Request(new SpawnPrefabRequest(SpawnPrefabRequestType.Vehicle_Hilux, 10));
             }
 
             if (SystemAPI.TryGetSingletonEntity<Tags.Player>(out player) &&
                 (UnityEngine.InputSystem.Keyboard.current.lKey.isPressed ||
                  UnityEngine.InputSystem.Keyboard.current.kKey.wasPressedThisFrame)) {
-                SystemAPI.GetComponent<Components.AttributeQueue>(root)
+                SystemAPI.GetSingleton<Components.AttributeQueue>()
                     .Request(new(100.0d, player, AttributeType.health));
             }
         }

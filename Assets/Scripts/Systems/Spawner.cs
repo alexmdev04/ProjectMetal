@@ -16,23 +16,21 @@ namespace Metal {
         [UpdateInGroup(typeof(SimulationSystemGroup), OrderFirst = true)]
         [BurstCompile]
         public partial struct Spawner : ISystem, ISystemStartStop {
-            public Entity 
-                root;
             public Random random;
             
             [BurstCompile]
             public void OnCreate(ref SystemState state) {
                 state.RequireForUpdate<BeginSimulationEntityCommandBufferSystem.Singleton>();
                 state.RequireForUpdate<Components.SpawnerData>();
-                state.RequireForUpdate<Tags.Root>();
+                state.RequireForUpdate<Components.AttributeManagerQueue>();
+                state.RequireForUpdate<Components.AttributeModManagerQueue>();
                 random = Random.CreateFromIndex((uint)math.lerp(0.0f, 9999999.9f, SystemAPI.Time.DeltaTime));
             }
 
             [BurstCompile]
             public void OnStartRunning(ref SystemState state) {
-                root = SystemAPI.GetSingletonEntity<Tags.Root>();
                 state.EntityManager.AddComponentData(
-                    root,
+                    state.SystemHandle,
                     new Components.SpawnerQueue() {
                         q = new NativeQueue<SpawnPrefabRequest>(Allocator.Persistent)
                     }
@@ -41,13 +39,14 @@ namespace Metal {
 
             [BurstCompile]
             public void OnUpdate(ref SystemState state) {
-                NativeQueue<SpawnPrefabRequest> spawnerQueue = SystemAPI.GetComponentRO<Components.SpawnerQueue>(root).ValueRO.q; 
-                if (spawnerQueue.IsEmpty()) { return; }
+                NativeQueue<SpawnPrefabRequest> spawnerQueue = SystemAPI.GetComponent<Components.SpawnerQueue>(state.SystemHandle).q;
+                int spawnerQueueLength = spawnerQueue.Count;
+                if (spawnerQueueLength == 0) { return; }
                 
                 var ecb = SystemAPI.GetSingleton<BeginSimulationEntityCommandBufferSystem.Singleton>()
                     .CreateCommandBuffer(state.WorldUnmanaged).AsParallelWriter();
 
-                Components.SpawnerData spawnerData = SystemAPI.GetComponent<Components.SpawnerData>(root);
+                Components.SpawnerData spawnerData = SystemAPI.GetSingleton<Components.SpawnerData>();
                 NativeArray<SpawnPrefabRequest> spawnerArray = spawnerQueue.ToArray(Allocator.TempJob);
                 spawnerQueue.Clear();
 
@@ -58,33 +57,36 @@ namespace Metal {
                 }
                 
                 new SpawnerJob() {
+                    // attributeManagerQueue = SystemAPI.GetSingleton<AttributeManagerQueue>().q.AsParallelWriter(),
+                    // attributeModManagerQueue = SystemAPI.GetSingleton<AttributeModManagerQueue>().q.AsParallelWriter(),
                     spawnerData = spawnerData,
                     spawnRequests = spawnerArray,
                     random = new Random(random.NextUInt()),
                     ecb = ecb,
                     playerFound = playerFound,
                     playerPosition = playerPosition
-                }.Schedule(spawnerArray.Length, 32).Complete();
-
+                }.Run(spawnerQueueLength);
                 spawnerArray.Dispose();
             }
 
             [BurstCompile]
-            public void OnDestroy(ref SystemState state) {
-                if (SystemAPI.TryGetSingleton(out Components.SpawnerQueue spawnerQueue)) {
-                    spawnerQueue.q.Dispose();
-                }
-            }
-
-            [BurstCompile]
-            public void OnStopRunning(ref SystemState state) { 
+            public void OnStopRunning(ref SystemState state) {
                 
+            }
+            
+            [BurstCompile]
+            public void OnDestroy(ref SystemState state) { 
+                SystemAPI.GetComponent<SpawnerQueue>(state.SystemHandle).q.Dispose();
             }
         }
         
         [BurstCompile]
         public struct SpawnerJob : IJobParallelFor {
             public EntityCommandBuffer.ParallelWriter ecb;
+            // [NativeDisableParallelForRestriction] [NativeDisableContainerSafetyRestriction]
+            // public NativeQueue<AttributeManagerRequest>.ParallelWriter attributeManagerQueue;
+            // [NativeDisableParallelForRestriction] [NativeDisableContainerSafetyRestriction]
+            // public NativeQueue<AttributeModManagerRequest>.ParallelWriter attributeModManagerQueue;
             public Components.SpawnerData spawnerData;
             [NativeDisableContainerSafetyRestriction]
             public NativeArray<SpawnPrefabRequest> spawnRequests;
@@ -109,7 +111,7 @@ namespace Metal {
                     }
 
                     if (request.isEnemy) {
-                        ecb.AddComponent<Tags.Controller.Pathed>(index, newEntity);
+                        ecb.AddComponent<Tags.Controller.Enemy>(index, newEntity);
                     }
 
                     if (request.isEnemy && playerFound) {
@@ -128,9 +130,9 @@ namespace Metal {
 
                     if (request.attributeConstructors.HasValue) {
                         foreach (AttributeConstructor attributeConstructor in request.attributeConstructors) {
-                            ecb.AddAttribute(index, newEntity, attributeConstructor);
-                            break;
+                            ecb.AttributeManagerRequest(index, AttributeManagerRequest.AddTemplate(newEntity, attributeConstructor));
                         }
+                        break;
                     }
                     
                     if (spawnerData.spawnerLogging) {
@@ -199,7 +201,13 @@ namespace Metal {
             this.spawnTransform = LocalTransform.Identity;
             this.isPlayer = false;
             this.isEnemy = true;
-            this.attributeConstructors = null;
+            var tempConstructors = new NativeArray<AttributeConstructor>(5, Allocator.Temp);
+            tempConstructors[0] = new AttributeConstructor(AttributeType.health, 100.0d);
+            tempConstructors[1] = new AttributeConstructor(AttributeType.damage, 10.0d);
+            tempConstructors[2] = new AttributeConstructor(AttributeType.accelerationSpeed, 15.0d);
+            tempConstructors[3] = new AttributeConstructor(AttributeType.cooldownRate, 1.0d);
+            tempConstructors[4] = new AttributeConstructor(AttributeType.fireRate, 1.0d);
+            this.attributeConstructors = tempConstructors;
         }
     }
 }
