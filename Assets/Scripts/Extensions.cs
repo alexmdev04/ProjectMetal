@@ -338,6 +338,16 @@ namespace Metal {
         public static double InversePow(in double originalResult, in double originalExponent) {
             return math.pow(originalResult, 1.0d / originalExponent);
         }
+        
+        [BurstCompile]
+        public static void PointToPointDirection(in float3 originPoint, in float3 targetPoint, out float3 direction) {
+            direction = -math.normalize(originPoint - targetPoint);
+        }
+
+        [BurstCompile]
+        public static void GetChildRelativePosition(in float3 parentPos, in quaternion parentRot, in float3 childLocalPos, out float3 childRelativePos) {
+            childRelativePos = parentPos + math.rotate(parentRot, childLocalPos);
+        }
     }
 
     #if UNITY_EDITOR

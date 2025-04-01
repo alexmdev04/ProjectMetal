@@ -6,7 +6,6 @@ using Unity.Logging;
 using Unity.Mathematics;
 using Unity.Physics;
 using Unity.Transforms;
-using UnityEngine;
 using RaycastHit = Unity.Physics.RaycastHit;
 
 namespace Metal.Systems {
@@ -18,6 +17,7 @@ namespace Metal.Systems {
     [UpdateBefore(typeof(Movement))]
     public partial struct Controller : ISystem, ISystemStartStop {
         private Entity player, playerVehicleMountEntity, root;
+        public ComponentLookup<LocalTransform> transformLookup;
         //private CollisionFilter aimCursorCastFilter;
 
         [BurstCompile]
@@ -26,6 +26,7 @@ namespace Metal.Systems {
             state.RequireForUpdate<Components.Input>();
             state.RequireForUpdate<Tags.Player>();
             state.RequireForUpdate<Tags.Root>();
+            transformLookup = state.GetComponentLookup<LocalTransform>();
             // aimCursorCastFilter = new CollisionFilter {
             //     BelongsTo = CollisionFilter.Default.BelongsTo,
             //     CollidesWith = ~(uint)Movement.CollisionLayer.vehicle,
@@ -45,31 +46,63 @@ namespace Metal.Systems {
 
         [BurstCompile]
         public void OnUpdate(ref SystemState state) {
+            transformLookup.Update(ref state);
             RefRO<Components.Input> input = SystemAPI.GetComponentRO<Components.Input>(root);
             RefRW<Components.Controller> playerController = SystemAPI.GetComponentRW<Components.Controller>(player);
             playerController.ValueRW.movementInput = input.ValueRO.movement;
             
-            LocalTransform playerTransform = SystemAPI.GetComponentRO<LocalTransform>(player).ValueRO;
-            
+            Log.Warning("Using ComponentLookup<LocalTransform> in OnUpdate crashes a Unity Job sometimes -_-");
+            LocalTransform playerTransform = transformLookup[player];
             if (Hint.Likely(playerVehicleMountEntity != Entity.Null)) {
-                RefRW<LocalTransform> mountTransform = SystemAPI.GetComponentRW<LocalTransform>(playerVehicleMountEntity);
-                var mountPos = playerTransform.Position + math.rotate(playerTransform.Rotation, mountTransform.ValueRO.Position);
+                SystemAPI.GetSingleton<PhysicsWorldSingleton>().PhysicsWorld.CastRay(
+                    input.ValueRO.aimCursorRay, out RaycastHit hitData);
                 
-                SystemAPI.GetSingleton<PhysicsWorldSingleton>().PhysicsWorld.CastRay(input.ValueRO.aimCursorRay, out RaycastHit hitData);
-                var weaponToAimCursorWorldPosDir = -math.normalize(mountPos - hitData.Position);
-                mountTransform.ValueRW.Rotation = math.mul(
-                    math.inverse(playerTransform.Rotation),
-                    quaternion.LookRotation(weaponToAimCursorWorldPosDir, math.up())
+                GetMountDirection(
+                    transformLookup[playerVehicleMountEntity].Position,
+                    playerTransform, 
+                    hitData.Position,
+                    out playerController.ValueRW.aimInput
                 );
-                playerController.ValueRW.aimInput = weaponToAimCursorWorldPosDir;
             }
             
             // new PlayerJob {
             //     movementInput = SystemAPI.GetSingleton<Components.Input>().movement
             // }.ScheduleParallel();
             new EnemyJob {
-                playerPos = playerTransform.Position,
+                playerTransform = playerTransform,
+                transformLookup = transformLookup
             }.ScheduleParallel();
+        }
+        
+        [BurstCompile]
+        public static void AimMountToPoint(
+            in float3 mountLocalPos,
+            in LocalTransform parentTransform, 
+            in float3 targetPoint,
+            out quaternion localRotation) {
+            GetMountDirection(mountLocalPos, parentTransform, targetPoint, out var aimDir);
+            GetMountRotation(aimDir, parentTransform.Rotation, out localRotation);
+        }
+        
+        [BurstCompile]
+        public static void GetMountDirection(
+            in float3 mountLocalPos,
+            in LocalTransform parentTransform, 
+            in float3 targetPoint,
+            out float3 aimDir) {
+            Extensions.GetChildRelativePosition(parentTransform.Position, parentTransform.Rotation, mountLocalPos, out var mountPos);
+            Extensions.PointToPointDirection(mountPos, targetPoint, out aimDir);
+        }
+        
+        [BurstCompile]
+        public static void GetMountRotation(
+            in float3 direction,
+            in quaternion parentRotation,
+            out quaternion localRotation) {
+            localRotation = math.mul(
+                math.inverse(parentRotation),
+                quaternion.LookRotation(direction, math.up())
+            );
         }
 
         [BurstCompile]
@@ -93,24 +126,31 @@ namespace Metal.Systems {
 
     [BurstCompile]
     internal partial struct EnemyJob : IJobEntity {
-        [ReadOnly] public float3 playerPos;
+        [ReadOnly] public LocalTransform playerTransform;
+        [ReadOnly] public ComponentLookup<LocalTransform> transformLookup;
         [BurstCompile]
         private void Execute(
-            RefRO<LocalTransform> transform,
+            in Entity entity,
             RefRW<Components.Controller> controller,
+            RefRO<Components.Vehicle> vehicle,
             in Tags.Controller.Enemy filter1) {
 
-            float4x4 transformMatrix = transform.ValueRO.ToMatrix();
+            var transform = transformLookup[entity];
+            float4x4 transformMatrix = transform.ToMatrix();
             
             float3 localSelfToPlayerDir = transformMatrix.InverseTransformDirection( // localise
-                math.normalize(playerPos - transform.ValueRO.Position) // world direction to player
+                math.normalize(playerTransform.Position - transform.Position) // world direction to player
             );
-            
-            //float3 
-                
                 
             controller.ValueRW.movementInput = new float3(localSelfToPlayerDir.z < 0.0f ? math.sign(localSelfToPlayerDir.x) : localSelfToPlayerDir.x, 0, 1.0f);
-            //UnityEngine.Debug.DrawRay(transform.ValueRO.Position, movement.ValueRW.input, Color.green);
+            if (Hint.Likely(vehicle.ValueRO.weaponMountEntity != Entity.Null)) {
+                Controller.GetMountDirection(
+                    transformLookup[vehicle.ValueRO.weaponMountEntity].Position,
+                    transform,
+                    playerTransform.Position,
+                    out controller.ValueRW.aimInput
+                );
+            }
         }
     }
 }
