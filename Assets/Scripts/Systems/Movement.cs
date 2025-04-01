@@ -6,7 +6,7 @@ using Unity.Physics;
 using Unity.Physics.Extensions;
 using Unity.Physics.Systems;
 using Unity.Transforms;
-using RaycastHit = Unity.Physics.RaycastHit;
+
 namespace Metal.Systems {
     /// <summary>
     /// Executes calculations to move an entity, the entity must have a movement tag (e.g. Tags.Movement.Vehicle)
@@ -21,6 +21,7 @@ namespace Metal.Systems {
             vehicle = 1 << 1
         }
         private ComponentLookup<LocalTransform> transformLookup;
+        private ComponentLookup<Components.AttAccelerationSpeedModValue> accelSpeedLookup;
         private BufferLookup<Authoring.WheelEntity> wheelEntitiesLookup;
         private const float fixedDeltaTime = 1.0f / 60.0f;
         
@@ -28,6 +29,7 @@ namespace Metal.Systems {
         public void OnCreate(ref SystemState state) {
             state.RequireForUpdate<PhysicsWorldSingleton>();
             transformLookup = state.GetComponentLookup<LocalTransform>();
+            accelSpeedLookup = state.GetComponentLookup<Components.AttAccelerationSpeedModValue>();
             wheelEntitiesLookup = state.GetBufferLookup<Authoring.WheelEntity>();
         }
 
@@ -39,10 +41,12 @@ namespace Metal.Systems {
         [BurstCompile]
         public void OnUpdate(ref SystemState state) {
             transformLookup.Update(ref state);
+            accelSpeedLookup.Update(ref state);
             wheelEntitiesLookup.Update(ref state);
             new VehicleJob {
                 physicsWorld = SystemAPI.GetSingleton<PhysicsWorldSingleton>().PhysicsWorld,
                 transformLookup = transformLookup,
+                accelSpeedLookup = accelSpeedLookup,
                 wheelEntitiesLookup = wheelEntitiesLookup,
                 fixedDeltaTime = fixedDeltaTime,
                 wheelCollisionFilter = new CollisionFilter {
@@ -70,6 +74,7 @@ namespace Metal.Systems {
     public partial struct VehicleJob : IJobEntity {
         [ReadOnly] public PhysicsWorld physicsWorld;
         [ReadOnly] public ComponentLookup<LocalTransform> transformLookup;
+        [ReadOnly] public ComponentLookup<Components.AttAccelerationSpeedModValue> accelSpeedLookup;
         [ReadOnly] public BufferLookup<Authoring.WheelEntity> wheelEntitiesLookup;
         [ReadOnly] public float fixedDeltaTime;
         [ReadOnly] public CollisionFilter wheelCollisionFilter;
@@ -144,11 +149,14 @@ namespace Metal.Systems {
 
             // Accel/Decel
 
+            float accelSpeed = accelSpeedLookup.TryGetComponent(vehicleEntity, out var modValue) ? 
+                (float)modValue.value : vehicle.ValueRO.accelerationForce;
+
             if (vehicle.ValueRO.enableAcceleration) {
                 Extensions.AddForceAtPosition(
                     ref linearVelocityAccumulated,
                     ref angularVelocityAccumulated,
-                    vehicleTransformMatrix.Forward() * inputDirection.z * vehicle.ValueRO.accelerationForce,
+                    vehicleTransformMatrix.Forward() * inputDirection.z * accelSpeed,
                     vehicleTransformMatrix.TransformPoint(vehicle.ValueRO.accelerationPointOffset),
                     vehicleMass.ValueRO.InverseMass,
                     vehicleMass.ValueRO.InverseInertia,
