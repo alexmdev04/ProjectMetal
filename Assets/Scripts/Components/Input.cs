@@ -1,5 +1,6 @@
 using Unity.Entities;
 using Unity.Mathematics;
+using Unity.Physics;
 
 namespace Metal {
     public struct button {
@@ -10,12 +11,14 @@ namespace Metal {
 
     namespace Components {
         public struct Input : IComponentData {
-            public float3 
+            public float3
                 movement;
             
+            public RaycastInput
+                aimCursorRay;
+
             public float2
-                aimDirectional,
-                aimCursor;
+                aimDirectional;
 
             public button
                 brake,

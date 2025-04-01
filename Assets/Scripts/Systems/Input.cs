@@ -1,13 +1,17 @@
 using Unity.Entities;
 using UnityEngine;
 using Metal.Input;
+using Unity.Logging;
 using Unity.Mathematics;
+using Unity.Physics;
 
 namespace Metal.Systems {
     [UpdateInGroup(typeof(InitializationSystemGroup))]
     [UpdateBefore(typeof(Controller))]
     public partial class Input : SystemBase {
         private GameInput input;
+        private Camera mainCamera;
+        private CollisionFilter aimCursorRayFilter;
 
         protected override void OnCreate() {
             input = new GameInput();
@@ -15,6 +19,12 @@ namespace Metal.Systems {
 
         protected override void OnStartRunning() {
             input.Enable();
+            mainCamera = Camera.main;
+            aimCursorRayFilter = new CollisionFilter {
+                BelongsTo = CollisionFilter.Default.BelongsTo,
+                CollidesWith = ~(uint)Movement.CollisionLayer.vehicle,
+                GroupIndex = CollisionFilter.Default.GroupIndex,
+            };
         }
 
         protected override void OnUpdate() {
@@ -23,7 +33,12 @@ namespace Metal.Systems {
 
             inputComponent.ValueRW.movement = new float3(movementValue.x, 0.0f, movementValue.y);
             inputComponent.ValueRW.aimDirectional = input.Player.AimDirectional.ReadValue<Vector2>();
-            inputComponent.ValueRW.aimCursor = input.Player.AimCursor.ReadValue<Vector2>();
+            var aimCursorRay = mainCamera.ScreenPointToRay(input.Player.AimCursor.ReadValue<Vector2>());
+            inputComponent.ValueRW.aimCursorRay = new RaycastInput { 
+                    Start = aimCursorRay.origin, 
+                    End = aimCursorRay.origin + aimCursorRay.direction * 250.0f,
+                    Filter = aimCursorRayFilter
+            };
             inputComponent.ValueRW.brake = new button {
                 isPressed = input.Player.Brake.IsPressed(),
                 wasReleasedThisFrame = input.Player.Brake.WasReleasedThisFrame(),
